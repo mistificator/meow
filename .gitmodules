@@ -1,0 +1,3 @@
+[submodule "QtWebKit"]
+	path = QtWebKit
+	url = https://github.com/annulen/webkit.git
