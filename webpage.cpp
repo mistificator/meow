@@ -9,6 +9,7 @@
 #include <QNetworkRequest>
 #include <QDebug>
 #include <QNetworkProxy>
+#include <QtWebKit/QWebElement>
 #if QT_VERSION >= 0x050000
     #include <QStandardPaths>
 #endif
@@ -238,15 +239,29 @@ QWebHitTestResult WebPage::hitTest(QPoint pos) const
 
 void WebPage::linkClicked(QUrl url)
 {
-    view()->load(url);
+    current_pos = view()->mapFromGlobal(QCursor::pos());
+    view()->pageAction(QWebPage::OpenLink)->trigger();
 }
 
 void WebPage::actionOpenLink()
 {
-    QUrl url = hitTest(current_pos).linkUrl();
+    QWebHitTestResult hit_test = hitTest(current_pos);
+    QUrl url = hit_test.linkUrl();
     if (!url.isEmpty() && url.isValid())
     {
-        linkClicked(url);
+        QWebElement element = hit_test.element();
+        while (!element.isNull() && element.tagName().compare("a", Qt::CaseInsensitive) != 0)
+        {
+            element = element.parent();
+        }
+        if (element.attribute("target").contains("blank", Qt::CaseInsensitive))
+        {
+            emit newWindowLink(url);
+        }
+        else
+        {
+            view()->load(url);
+        }
     }
 }
 
@@ -321,6 +336,28 @@ QString WebPage::adjustFilename(QString filename, const QByteArray & data)
     return filename;
 }
 
+void WebPage::modifyExif(QString filename, QUrl url, QStringList tags)
+{
+    if (fmeta.setImage(filename))
+    {
+        if (
+                fmeta.setField(FileMetadata::TagXPKeywords, tags.join("; ").toLocal8Bit()) &&
+                fmeta.setField(FileMetadata::TagExifUserComment, url.toEncoded())
+            )
+        {
+            qDebug() << "properties of" << QFileInfo(filename).fileName() << "updated";
+        }
+        else
+        {
+            qDebug() << "properties of" << QFileInfo(filename).fileName() << "NOT updated";
+        }
+    }
+    else
+    {
+        qDebug() << "couldn't open" << QFileInfo(filename).fileName() << "to update properties";
+    }
+}
+
 void WebPage::saveReplyToDisk(QNetworkReply * reply)
 {
     QByteArray data = reply->readAll();
@@ -354,6 +391,8 @@ void WebPage::saveReplyToDisk(QNetworkReply * reply)
     {
         file.write(data);
         file.close();
+
+        modifyExif(file.fileName(), url, QStringList() << "meow" << "download");
 
         QString link;
         int count = 0;

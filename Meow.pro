@@ -8,16 +8,23 @@ QT       += core gui widgets network svg
 
 LIBS += Qt5WebKit.lib Qt5WebKitWidgets.lib
 
+win32:
+{
+LIBS += gdiplus.lib
+}
+
 TARGET = Meow
 TEMPLATE = app
 
 
 SOURCES += main.cpp\
         mainwindow.cpp \
-        webpage.cpp
+        webpage.cpp \
+    filemetadata.cpp
 
 HEADERS  += mainwindow.h \
-            webpage.h
+            webpage.h \
+    filemetadata.h
 
 FORMS    += mainwindow.ui \
             webpage.ui

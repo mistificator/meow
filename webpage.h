@@ -8,6 +8,8 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 
+#include "filemetadata.h"
+
 namespace Ui {
 class WebPage;
 }
@@ -52,11 +54,13 @@ private:
     QPoint current_pos;
     QNetworkAccessManager * manager;
     QString download_location;
+    FileMetadata fmeta;
     void applyIcon();
     void applyTitle();
     QWebHitTestResult hitTest(QPoint) const;
     static QString adjustFilename(QString filename, const QByteArray & data);
     void saveReplyToDisk(QNetworkReply * reply);
+    void modifyExif(QString filename, QUrl url, QStringList tags);
 protected:
     void showEvent(QShowEvent *);
 signals:

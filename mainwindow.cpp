@@ -80,7 +80,7 @@ void MainWindow::on_actionAddTab_triggered()
     ui->tabWidget->setTabIcon(index, style()->standardIcon(QStyle::SP_ComputerIcon));
 
     connect(last_page, SIGNAL(newWindowLink(QUrl)), this, SLOT(newWindowLink(QUrl)));
-    connect(last_page, SIGNAL(linkHovered(QString,QString,QString)), this, SLOT(linkHovered(QString,QString,QString)));
+    connect(last_page, SIGNAL(linkHovered(QString, QString, QString)), this, SLOT(linkHovered(QString, QString, QString)));
 }
 
 void MainWindow::on_tabWidget_tabCloseRequested(int index)
