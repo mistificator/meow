@@ -11,6 +11,8 @@
 #include <QGraphicsOpacityEffect>
 #include <QPropertyAnimation>
 
+#include "settingspage.h"
+
 class TabWidgetOpener: public QTabWidget
 {
 public:
@@ -23,7 +25,7 @@ public:
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
-    last_page(0)
+    last_page(0), settings_page(0)
 {
     foreach(QNetworkProxy proxy, QNetworkProxyFactory::systemProxyForQuery())
     {
@@ -44,8 +46,11 @@ MainWindow::MainWindow(QWidget *parent) :
 
     setWindowIcon(style()->standardIcon(QStyle::SP_ComputerIcon));
     ui->actionAddTab->setIcon(style()->standardIcon(QStyle::SP_DirHomeIcon));
+    ui->actionShowSettings->setIcon(style()->standardIcon(QStyle::SP_DriveNetIcon));
 
     newtab_menu.addAction(ui->actionAddTab);
+    newtab_menu.addSeparator();
+    newtab_menu.addAction(ui->actionShowSettings);
 
     // taken from https://stackoverflow.com/questions/19975137/how-can-i-add-a-new-tab-button-next-to-the-tabs-of-a-qmdiarea-in-tabbed-view-m/27127109#27127109
     QToolButton *tb = new QToolButton();
@@ -92,6 +97,10 @@ void MainWindow::on_tabWidget_tabCloseRequested(int index)
     if (WebPage * page = dynamic_cast<WebPage *>(w))
     {
         page->view()->load(QUrl("about:blank"));
+    }
+    if (w == settings_page)
+    {
+        settings_page = 0;
     }
     w->deleteLater();
 
@@ -144,4 +153,20 @@ void MainWindow::hideNotifier()
     a->start(QPropertyAnimation::DeleteWhenStopped);
     connect(a, SIGNAL(finished()), notifier, SLOT(hide()));
     connect(a, SIGNAL(finished()), notifier_timer, SLOT(stop()));
+}
+
+void MainWindow::on_actionShowSettings_triggered()
+{
+    if (settings_page)
+    {
+        ui->tabWidget->setCurrentWidget(settings_page);
+        return;
+    }
+    int index = ui->tabWidget->count() - 1;
+    ui->tabWidget->insertTab(index, settings_page = new QScrollArea(this), "Settings");
+    ui->tabWidget->setCurrentIndex(index);
+    ui->tabWidget->setTabIcon(index, style()->standardIcon(QStyle::SP_DriveNetIcon));
+
+    settings_page->setAlignment(Qt::AlignHCenter);
+    settings_page->setWidget(new SettingsPage());
 }

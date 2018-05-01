@@ -6,6 +6,7 @@
 #include <QMenu>
 #include <QLabel>
 #include <QTimer>
+#include <QScrollArea>
 #include "webpage.h"
 
 class WebPage;
@@ -29,6 +30,8 @@ private slots:
     void linkHovered(const QString & link, const QString & title, const QString & textContent);
     void showNotifier(QString, int timeout = 5000);
     void hideNotifier();
+    void on_actionShowSettings_triggered();
+
 private:
     Ui::MainWindow *ui;
     QString temp_dir;
@@ -36,6 +39,7 @@ private:
     QMenu newtab_menu;
     QLabel * notifier;
     QTimer * notifier_timer;
+    QScrollArea * settings_page;
 };
 
 #endif // MAINWINDOW_H

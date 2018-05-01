@@ -20,11 +20,14 @@ TEMPLATE = app
 SOURCES += main.cpp\
         mainwindow.cpp \
         webpage.cpp \
-    filemetadata.cpp
+    filemetadata.cpp \
+    settingspage.cpp
 
 HEADERS  += mainwindow.h \
             webpage.h \
-    filemetadata.h
+    filemetadata.h \
+    settingspage.h
 
 FORMS    += mainwindow.ui \
-            webpage.ui
+            webpage.ui \
+    settingspage.ui

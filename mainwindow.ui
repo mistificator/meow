@@ -69,6 +69,14 @@
     <string>Ctrl+T</string>
    </property>
   </action>
+  <action name="actionShowSettings">
+   <property name="text">
+    <string>Show settings</string>
+   </property>
+   <property name="toolTip">
+    <string>Show settings</string>
+   </property>
+  </action>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
  <resources/>
