@@ -221,6 +221,37 @@ QString SettingsPage::currentSearchEngineUrl()
     return engines.at(index);
 }
 
+
+bool SettingsPage::setSavePolicy(SavePolicy policy)
+{
+    return setValue("SavePolicy", QString::number(policy));
+}
+
+SettingsPage::SavePolicy SettingsPage::savePolicy()
+{
+    return value("SavePolicy");
+}
+
+bool SettingsPage::setSavePath(QString path)
+{
+    return setValue("SavePath", path);
+}
+
+QString SettingsPage::savePath()
+{
+    return value("SavePath");
+}
+
+bool SettingsPage::setCurrentSavePath(QString path)
+{
+    return setValue("CurrentSavePath", path);
+}
+
+QString SettingsPage::currentSavePath()
+{
+    return value("CurrentSavePath");
+}
+
 void SettingsPage::on_pageEmpty_toggled(bool checked)
 {
     if (checked)

@@ -37,6 +37,14 @@ public:
     static bool setCurrentSearchEngine(int);
     static int currentSearchEngine();
     static QString currentSearchEngineUrl();
+
+    enum SavePolicy {SaveAsk = 0, SaveSilent = 1};
+    static bool setSavePolicy(SavePolicy);
+    static SavePolicy savePolicy();
+    static bool setSavePath(QString);
+    static QString savePath();
+    static bool setCurrentSavePath(QString);
+    static QString currentSavePath();
 signals:
     void proxyChanged(SettingsPage::ProxyType);
 private slots:

@@ -378,8 +378,6 @@ void WebPage::saveReplyToDisk(QNetworkReply * reply)
     QByteArray data = reply->readAll();
     QUrl url = reply->url();
 
-    QString url_adjusted = url.toString(QUrl::RemoveScheme | QUrl::RemovePort);
-    QString filename = QFileInfo(url_adjusted).fileName();
     if (data.trimmed().startsWith("<"))
     {
         qDebug() << "redirect detected" << url;
@@ -391,12 +389,23 @@ void WebPage::saveReplyToDisk(QNetworkReply * reply)
         redirect_page->view()->load(url);
         return;
     }
+    QString url_adjusted = url.toString(QUrl::RemoveScheme | QUrl::RemovePort);
+    QString filename = QFileInfo(url_adjusted).fileName();
     if (filename.contains(QRegExp("[&,\\:?]")))
     {
         filename.clear();
     }
 
-    QString dir = QFileInfo(url_adjusted).dir().path();
+    switch (SettingsPage::savePolicy())
+    {
+    case SettingsPage::SaveAsk:
+        break;
+    case SettingsPage::SaveSilent:
+        break;
+    }
+
+//    QString dir = QFileInfo(url_adjusted).dir().path();
+    QString dir = QFileInfo(current_url.toString(QUrl::RemoveScheme | QUrl::RemovePort)).dir().path();
     qDebug() << "download" << dir << filename << reply->isFinished();
     QString path = download_location + "/meow" + dir + "/";
     QDir().mkpath(path);
