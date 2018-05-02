@@ -15,7 +15,7 @@
   </property>
   <layout class="QVBoxLayout" name="verticalLayout_5">
    <item>
-    <widget class="QGroupBox" name="groupBox">
+    <widget class="QGroupBox" name="GroupStartPage">
      <property name="title">
       <string>Start page</string>
      </property>
@@ -50,7 +50,7 @@
          <string/>
         </property>
         <property name="placeholderText">
-         <string>https://google.com</string>
+         <string>https://duckduckgo.com</string>
         </property>
        </widget>
       </item>
@@ -58,7 +58,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QGroupBox" name="groupBox_2">
+    <widget class="QGroupBox" name="GroupProxy">
      <property name="title">
       <string>Proxy settings</string>
      </property>
@@ -98,7 +98,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QGroupBox" name="groupBox_3">
+    <widget class="QGroupBox" name="GroupSearch">
      <property name="title">
       <string>Search engine</string>
      </property>
@@ -131,7 +131,7 @@
     </widget>
    </item>
    <item>
-    <widget class="QGroupBox" name="groupBox_4">
+    <widget class="QGroupBox" name="GroupSave">
      <property name="title">
       <string>Save files policy</string>
      </property>

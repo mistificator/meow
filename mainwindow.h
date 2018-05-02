@@ -8,8 +8,7 @@
 #include <QTimer>
 #include <QScrollArea>
 #include "webpage.h"
-
-class WebPage;
+#include "settingspage.h"
 
 namespace Ui {
 class MainWindow;
@@ -31,7 +30,7 @@ private slots:
     void showNotifier(QString, int timeout = 5000);
     void hideNotifier();
     void on_actionShowSettings_triggered();
-
+    void proxyChanged(SettingsPage::ProxyType);
 private:
     Ui::MainWindow *ui;
     QString temp_dir;
@@ -40,6 +39,10 @@ private:
     QLabel * notifier;
     QTimer * notifier_timer;
     QScrollArea * settings_page;
+    void openLastPages();
+    void saveLastPages();
+    void openHomePage();
+    void openEmptyPage();
 };
 
 #endif // MAINWINDOW_H

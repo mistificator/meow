@@ -1,14 +1,332 @@
 #include "settingspage.h"
 #include "ui_settingspage.h"
+#include <QDir>
+#include <QDebug>
+#include <QSqlQuery>
+#include <QSqlError>
+#include <QtWebKit/QWebSettings>
+#include <QUrl>
 
 SettingsPage::SettingsPage(QWidget *parent) :
     QWidget(parent),
     ui(new Ui::SettingsPage)
 {
+    qRegisterMetaType<SettingsPage::ProxyType>("SettingsPage::ProxyType");
+
     ui->setupUi(this);
+
+    StartPage start_page = startPage();
+    ui->pageEmpty->setChecked(start_page == PageEmpty);
+    ui->pageLast->setChecked(start_page == PageLast);
+    ui->pageHome->setChecked(start_page == PageHome);
+    ui->pageAddress->setText(homePage());
+
+    ProxyType proxy_type = proxyType();
+    ui->proxyDisabled->setChecked(proxy_type == ProxyDisabled);
+    ui->proxySystem->setChecked(proxy_type == ProxySystem);
+    ui->proxyEnabled->setChecked(proxy_type == ProxySpecified);
+    ui->proxyAdress->setText(proxyAddress());
+
+    const int engine_index = currentSearchEngine();
+    ui->searchEngine->addItems(searchEngines());
+    ui->searchEngine->setCurrentIndex(engine_index);
+    ui->searchRemove->setIcon(style()->standardIcon(QStyle::SP_LineEditClearButton));
 }
 
 SettingsPage::~SettingsPage()
 {
     delete ui;
+}
+
+QString SettingsPage::tempDir()
+{
+    QString temp_dir = QDir::tempPath() + "/meow/";
+    if (!QDir().exists(temp_dir))
+    {
+        QDir().mkpath(temp_dir);
+        qDebug() << "temp dir" << temp_dir;
+    }
+    return temp_dir;
+}
+
+QSqlDatabase SettingsPage::database()
+{
+    static QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE");
+    if (!db.isOpen())
+    {
+        db.setDatabaseName(tempDir() + "settings.sqlite");
+        if (db.open())
+        {
+            databaseInit(db);
+        }
+    }
+    return db;
+}
+
+void SettingsPage::databaseInit(QSqlDatabase & db)
+{
+    QSqlQuery q(db);
+    q.exec("CREATE TABLE GeneralSettings (Namespace TEXT, Field TEXT, Value TEXT)");
+    if (q.lastError().type() != QSqlError::NoError)
+    {
+        return;
+    }
+    setStartPage(PageEmpty);
+    setHomePage("https://duckduckgo.com");
+    setProxyType(ProxySystem);
+    setSearchEngines(QStringList() <<
+                     "duckduckgo.com/?q=%1" <<
+                     "google.com/search?q=%1" <<
+                     "yandex.com/search/?text=%1");
+}
+
+bool SettingsPage::setValue(QString field, QString value, QString _namespace)
+{
+    if (!database().isOpen())
+    {
+        qDebug() << "database not open";
+        return false;
+    }
+    QSqlQuery q(database());
+    if (!values(field).isEmpty())
+    {
+        if (q.exec(QString("UPDATE GeneralSettings SET Value = \"%2\" WHERE Field = \"%1\" AND Namespace = \"%3\"").arg(field, value, _namespace)))
+        {
+            return q.lastError().type() == QSqlError::NoError;
+        }
+    }
+    q.exec(QString("INSERT INTO GeneralSettings (Field, Value, Namespace) VALUES (\"%1\", \"%2\", \"%3\")").arg(field, value, _namespace));
+    if (q.lastError().type() != QSqlError::NoError)
+    {
+        qDebug() << "sql error" << q.lastError().text();
+    }
+    return q.lastError().type() == QSqlError::NoError;
+}
+
+
+QStringList SettingsPage::values(QString field, QString _namespace)
+{
+    if (!database().isOpen())
+    {
+        qDebug() << "database not open";
+        return QStringList();
+    }
+    QSqlQuery q(database());
+    if (!q.exec(QString("SELECT Value FROM GeneralSettings WHERE Field = \"%1\" AND Namespace = \"%2\"").arg(field, _namespace)))
+    {
+        qDebug() << "sql error" << q.lastError().text();
+        return QStringList();
+    }
+    QStringList list;
+    while (q.next())
+    {
+        list << q.value(0).toString();
+    }
+    return list;
+}
+
+QString SettingsPage::value(QString field, QString defaultValue, QString _namespace)
+{
+    QStringList list = values(field, _namespace);
+    if (list.isEmpty())
+    {
+        return defaultValue;
+    }
+    return list.front();
+}
+
+bool SettingsPage::setStartPage(StartPage page)
+{
+    return setValue("StartPage", QString::number(page));
+}
+
+SettingsPage::StartPage SettingsPage::startPage()
+{
+    return (SettingsPage::StartPage)value("StartPage").toInt();
+}
+
+bool SettingsPage::setHomePage(QString address)
+{
+    return setValue("HomePage", address);
+}
+
+QString SettingsPage::homePage()
+{
+    return value("HomePage");
+}
+
+bool SettingsPage::setLastPages(QStringList addresses)
+{
+    return setValue("LastPages", addresses.join("\n"));
+}
+
+QStringList SettingsPage::lastPages()
+{
+    return value("LastPages").split("\n");
+}
+
+bool SettingsPage::setProxyType(ProxyType proxy)
+{
+    return setValue("ProxyType", QString::number(proxy));
+}
+
+SettingsPage::ProxyType SettingsPage::proxyType()
+{
+    return (ProxyType)value("ProxyType").toInt();
+}
+
+bool SettingsPage::setProxyAddress(QString address)
+{
+    return setValue("ProxyAddress", address);
+}
+
+QString SettingsPage::proxyAddress()
+{
+    return value("ProxyAddress");
+}
+
+bool SettingsPage::setSearchEngines(QStringList list)
+{
+    return setValue("SearchEngines", list.join("\n"));
+}
+
+QStringList SettingsPage::searchEngines()
+{
+    return value("SearchEngines").split("\n");
+}
+
+bool SettingsPage::setCurrentSearchEngine(int index)
+{
+    return setValue("SearchEngineCurrent", QString::number(index));
+}
+
+int SettingsPage::currentSearchEngine()
+{
+    const int index = value("SearchEngineCurrent").toInt();
+    if (index < 0 || index >= searchEngines().count())
+    {
+        return -1;
+    }
+    return index;
+}
+
+QString SettingsPage::currentSearchEngineUrl()
+{
+    const int index = value("SearchEngineCurrent").toInt();
+    const QStringList engines = searchEngines();
+    if (index < 0 || index >= engines.count())
+    {
+        return QString();
+    }
+    return engines.at(index);
+}
+
+void SettingsPage::on_pageEmpty_toggled(bool checked)
+{
+    if (checked)
+    {
+        setStartPage(PageEmpty);
+    }
+}
+
+void SettingsPage::on_pageLast_toggled(bool checked)
+{
+    if (checked)
+    {
+        setStartPage(PageLast);
+    }
+}
+
+void SettingsPage::on_pageHome_toggled(bool checked)
+{
+    if (checked)
+    {
+        setStartPage(PageHome);
+    }
+}
+
+void SettingsPage::on_pageAddress_editingFinished()
+{
+    setHomePage(ui->pageAddress->text());
+}
+
+void SettingsPage::on_proxyDisabled_toggled(bool checked)
+{
+    if (checked)
+    {
+        setProxyType(ProxyDisabled);
+        emit proxyChanged(ProxyDisabled);
+    }
+}
+
+void SettingsPage::on_proxySystem_toggled(bool checked)
+{
+    if (checked)
+    {
+        setProxyType(ProxySystem);
+        emit proxyChanged(ProxySystem);
+    }
+}
+
+void SettingsPage::on_proxyEnabled_toggled(bool checked)
+{
+    if (checked)
+    {
+        setProxyType(ProxySpecified);
+        emit proxyChanged(ProxySpecified);
+    }
+}
+
+QStringList SettingsPage::updateSearchEngines()
+{
+    QStringList list;
+    for (int i = 0; i < ui->searchEngine->count(); i++)
+    {
+        QString url =  ui->searchEngine->itemText(i);
+//        ui->searchEngine->setItemIcon(i, QWebSettings::iconForUrl(QUrl(url).adjusted(QUrl::RemovePath))); // don't work
+        list << url;
+    }
+    return list;
+}
+
+void SettingsPage::on_searchEngine_currentIndexChanged(int index)
+{
+    setSearchEngines(updateSearchEngines());
+    setCurrentSearchEngine(index);
+}
+
+void SettingsPage::on_searchEngine_editTextChanged(const QString &arg1)
+{
+}
+
+void SettingsPage::on_searchRemove_clicked()
+{
+    ui->searchEngine->removeItem(ui->searchEngine->currentIndex());
+    setSearchEngines(updateSearchEngines());
+    setCurrentSearchEngine(ui->searchEngine->currentIndex());
+}
+
+void SettingsPage::on_saveAsk_toggled(bool checked)
+{
+
+}
+
+void SettingsPage::on_saveSilent_toggled(bool checked)
+{
+
+}
+
+void SettingsPage::on_savePath_editingFinished()
+{
+
+}
+
+void SettingsPage::on_browseButton_clicked()
+{
+
+}
+
+void SettingsPage::on_writeMetadata_toggled(bool checked)
+{
+
 }

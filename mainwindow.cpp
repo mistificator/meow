@@ -11,8 +11,6 @@
 #include <QGraphicsOpacityEffect>
 #include <QPropertyAnimation>
 
-#include "settingspage.h"
-
 class TabWidgetOpener: public QTabWidget
 {
 public:
@@ -27,12 +25,7 @@ MainWindow::MainWindow(QWidget *parent) :
     ui(new Ui::MainWindow),
     last_page(0), settings_page(0)
 {
-    foreach(QNetworkProxy proxy, QNetworkProxyFactory::systemProxyForQuery())
-    {
-        qDebug() << "proxy" << proxy.hostName() << proxy.port();
-        QNetworkProxy::setApplicationProxy(proxy);
-        break;
-    }
+    proxyChanged(SettingsPage::proxyType());
 
     QWebSettings::globalSettings()->setAttribute(QWebSettings::DeveloperExtrasEnabled, true);
 
@@ -64,16 +57,25 @@ MainWindow::MainWindow(QWidget *parent) :
     // Add tab button to current tab. Button will be enabled, but tab -- not
     TabWidgetOpener::tabBar(ui->tabWidget)->setTabButton(0, QTabBar::RightSide, tb);
 
-    temp_dir = QDir::tempPath() + "/meow";
-    QDir().mkpath(temp_dir);
-    QWebSettings::enablePersistentStorage(temp_dir);    
-    qDebug() << "temp dir" << temp_dir;
+    QWebSettings::enablePersistentStorage(SettingsPage::tempDir());
 
-    ui->actionAddTab->trigger();
+    switch (SettingsPage::startPage())
+    {
+    case SettingsPage::PageEmpty:
+        openEmptyPage();
+        break;
+    case SettingsPage::PageHome:
+        openHomePage();
+        break;
+    case SettingsPage::PageLast:
+        openLastPages();
+        break;
+    }
 }
 
 MainWindow::~MainWindow()
 {
+    saveLastPages();
     delete ui;
 }
 
@@ -167,6 +169,67 @@ void MainWindow::on_actionShowSettings_triggered()
     ui->tabWidget->setCurrentIndex(index);
     ui->tabWidget->setTabIcon(index, style()->standardIcon(QStyle::SP_DriveNetIcon));
 
+    SettingsPage * page;
     settings_page->setAlignment(Qt::AlignHCenter);
-    settings_page->setWidget(new SettingsPage());
+    settings_page->setWidget(page = new SettingsPage());
+    connect(page, SIGNAL(proxyChanged(SettingsPage::ProxyType)), this, SLOT(proxyChanged(SettingsPage::ProxyType)));
+}
+
+void MainWindow::proxyChanged(SettingsPage::ProxyType proxy_type)
+{
+    switch (proxy_type)
+    {
+    case SettingsPage::ProxyDisabled:
+        QNetworkProxy::setApplicationProxy(QNetworkProxy(QNetworkProxy::NoProxy));
+        break;
+    case SettingsPage::ProxySystem:
+        foreach(QNetworkProxy proxy, QNetworkProxyFactory::systemProxyForQuery())
+        {
+            qDebug() << "proxy" << proxy.hostName() << proxy.port();
+            QNetworkProxy::setApplicationProxy(proxy);
+            break;
+        }
+        break;
+    case SettingsPage::ProxySpecified:
+        {
+            QStringList list = SettingsPage::proxyAddress().split(":");
+            if (list.count() < 2)
+            {
+                list << "8080";
+            }
+            QNetworkProxy::setApplicationProxy(QNetworkProxy(QNetworkProxy::HttpProxy, list.at(0), list.at(1).toInt()));
+        }
+        break;
+    }
+}
+
+void MainWindow::openLastPages()
+{
+    foreach (QString url, SettingsPage::lastPages())
+    {
+        newWindowLink(QUrl(url));
+    }
+}
+
+void MainWindow::saveLastPages()
+{
+    QStringList list;
+    for (int i = 0; i < ui->tabWidget->count(); i++)
+    {
+        if (WebPage * webpage = dynamic_cast<WebPage *>(ui->tabWidget->widget(i)))
+        {
+            list << webpage->view()->url().toString();
+        }
+    }
+    SettingsPage::setLastPages(list);
+}
+
+void MainWindow::openHomePage()
+{
+    newWindowLink(QUrl(SettingsPage::homePage()));
+}
+
+void MainWindow::openEmptyPage()
+{
+    ui->actionAddTab->trigger();
 }

@@ -15,6 +15,7 @@
 #endif
 
 #include "mainwindow.h"
+#include "settingspage.h"
 
 class UserAgentWebPage : public QWebPage
 {
@@ -99,13 +100,26 @@ void WebPage::on_actionLoadPage_triggered()
     QUrl url_copy(url);
     if (url.toString().trimmed().compare("about:blank", Qt::CaseInsensitive) != 0)
     {
+        if (!url.toString().contains("."))
+        {
+            QString search_engine = SettingsPage::currentSearchEngineUrl();
+            if (search_engine.contains("%1"))
+            {
+                url = search_engine.arg(QString(url_copy.toEncoded()));
+            }
+            else
+            if (!search_engine.isEmpty())
+            {
+                url = search_engine + url_copy.toEncoded();
+            }
+            else
+            {
+                url = "0.0.0.0";
+            }
+        }
         if (url.scheme().isEmpty())
         {
             url.setScheme("https");
-        }
-        if (!url.toString().contains("."))
-        {
-            url = "https://duckduckgo.com/?q=" + url_copy.toEncoded();
         }
     }
     view()->load(current_url = url);
@@ -155,7 +169,8 @@ void WebPage::on_webView_loadFinished(bool status)
     }
     else
     {
-        qDebug() << "load failed!!!";
+        qDebug() << "loading failed!!!";
+        page()->mainFrame()->setHtml("<html><body><div style=\"position: absolute; top: 0;bottom: 0; left: 0; right: 0; margin: auto; width: 200px; height: 100px;\"><h1>Loading failed</h1></div></body></html>");
     }
     applyIcon();
 }
