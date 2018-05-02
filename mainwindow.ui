@@ -77,6 +77,17 @@
     <string>Show settings</string>
    </property>
   </action>
+  <action name="actionAddIncognitoTab">
+   <property name="text">
+    <string>Add incognito tab</string>
+   </property>
+   <property name="toolTip">
+    <string>Add incognito tab</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+N</string>
+   </property>
+  </action>
  </widget>
  <layoutdefault spacing="6" margin="11"/>
  <resources/>

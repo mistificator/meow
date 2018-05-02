@@ -47,8 +47,15 @@ public:
     static QString currentSavePath();
     static bool setWriteMetadataEnabled(bool);
     static bool writeMetadataEnabed();
+
+    enum Privacy {UsualPrivacy = 0, IncognitoPrivacy = 1};
+    static bool setPrivacyPolicy(Privacy);
+    static Privacy privacyPolicy();
+    static bool setUseragentString(QString); // https://deviceatlas.com/blog/list-of-user-agent-strings
+    static QString useragentString();
 signals:
     void proxyChanged(SettingsPage::ProxyType);
+    void privacyChanged(SettingsPage::Privacy);
 private slots:
     void on_pageEmpty_toggled(bool checked);
     void on_pageLast_toggled(bool checked);
@@ -65,6 +72,10 @@ private slots:
     void on_savePath_editingFinished();
     void on_browseButton_clicked();
     void on_writeMetadata_toggled(bool checked);
+    void on_privacyDefaultUsual_toggled(bool checked);
+    void on_privacyDefaultIncognito_toggled(bool checked);
+    void on_useragentString_editingFinished();
+    void on_defaultUseragentString_clicked();
 private:
     Ui::SettingsPage *ui;
     QStringList updateSearchEngines();

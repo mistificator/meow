@@ -7,15 +7,21 @@
     <x>0</x>
     <y>0</y>
     <width>400</width>
-    <height>566</height>
+    <height>692</height>
    </rect>
   </property>
   <property name="windowTitle">
    <string>Form</string>
   </property>
-  <layout class="QVBoxLayout" name="verticalLayout_5">
+  <layout class="QVBoxLayout" name="verticalLayout_6">
    <item>
     <widget class="QGroupBox" name="GroupStartPage">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
      <property name="title">
       <string>Start page</string>
      </property>
@@ -59,6 +65,12 @@
    </item>
    <item>
     <widget class="QGroupBox" name="GroupProxy">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
      <property name="title">
       <string>Proxy settings</string>
      </property>
@@ -99,12 +111,21 @@
    </item>
    <item>
     <widget class="QGroupBox" name="GroupSearch">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
      <property name="title">
       <string>Search engine</string>
      </property>
      <layout class="QVBoxLayout" name="verticalLayout_3">
       <item>
        <layout class="QHBoxLayout" name="horizontalLayout">
+        <property name="sizeConstraint">
+         <enum>QLayout::SetDefaultConstraint</enum>
+        </property>
         <item>
          <widget class="QComboBox" name="searchEngine">
           <property name="editable">
@@ -120,6 +141,9 @@
             <height>24</height>
            </size>
           </property>
+          <property name="toolTip">
+           <string>Remove selected search engine</string>
+          </property>
           <property name="text">
            <string>-</string>
           </property>
@@ -132,6 +156,12 @@
    </item>
    <item>
     <widget class="QGroupBox" name="GroupSave">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
      <property name="title">
       <string>Save files policy</string>
      </property>
@@ -170,6 +200,9 @@
             <height>24</height>
            </size>
           </property>
+          <property name="toolTip">
+           <string>Browse filesystem to select folder</string>
+          </property>
           <property name="text">
            <string>...</string>
           </property>
@@ -183,6 +216,65 @@
          <string>Write metadata</string>
         </property>
        </widget>
+      </item>
+     </layout>
+    </widget>
+   </item>
+   <item>
+    <widget class="QGroupBox" name="GroupPrivacy">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="title">
+      <string>Privacy policy</string>
+     </property>
+     <layout class="QVBoxLayout" name="verticalLayout_5">
+      <item>
+       <widget class="QRadioButton" name="privacyDefaultUsual">
+        <property name="text">
+         <string>New tab button creates usual tab</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="privacyDefaultIncognito">
+        <property name="text">
+         <string>New tab button creates incognito tab</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QLabel" name="label">
+        <property name="text">
+         <string>User agent</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_3">
+        <item>
+         <widget class="QLineEdit" name="useragentString"/>
+        </item>
+        <item>
+         <widget class="QToolButton" name="defaultUseragentString">
+          <property name="minimumSize">
+           <size>
+            <width>24</width>
+            <height>24</height>
+           </size>
+          </property>
+          <property name="toolTip">
+           <string>Reset user-agent string to default</string>
+          </property>
+          <property name="text">
+           <string>x</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
       </item>
      </layout>
     </widget>
@@ -230,12 +322,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>145</x>
-     <y>470</y>
+     <x>168</x>
+     <y>458</y>
     </hint>
     <hint type="destinationlabel">
-     <x>163</x>
-     <y>510</y>
+     <x>187</x>
+     <y>489</y>
     </hint>
    </hints>
   </connection>
@@ -246,12 +338,28 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>224</x>
-     <y>475</y>
+     <x>247</x>
+     <y>458</y>
     </hint>
     <hint type="destinationlabel">
-     <x>364</x>
-     <y>499</y>
+     <x>375</x>
+     <y>490</y>
+    </hint>
+   </hints>
+  </connection>
+  <connection>
+   <sender>defaultUseragentString</sender>
+   <signal>clicked()</signal>
+   <receiver>useragentString</receiver>
+   <slot>clear()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>362</x>
+     <y>653</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>319</x>
+     <y>654</y>
     </hint>
    </hints>
   </connection>

@@ -13,7 +13,6 @@
 #include <QFileDialog>
 
 #include "mainwindow.h"
-#include "settingspage.h"
 
 class UserAgentWebPage : public QWebPage
 {
@@ -22,14 +21,19 @@ public:
 protected:
     virtual QString userAgentForUrl(const QUrl & url ) const
     {
-//        qDebug() << QWebPage::userAgentForUrl(url);
-        return QWebPage::userAgentForUrl(url);
+        QString str = SettingsPage::useragentString();
+        if (str.isEmpty())
+        {
+            SettingsPage::setUseragentString(str = QWebPage::userAgentForUrl(QUrl("https://example.com")));
+        }
+        return str;
     }
 };
 
-WebPage::WebPage(QWidget *parent) :
+WebPage::WebPage(Privacy _privacy, QWidget *parent) :
     QWidget(parent),
-    ui(new Ui::WebPage)
+    ui(new Ui::WebPage),
+    privacy(_privacy)
 {
     ui->setupUi(this);
 
@@ -46,7 +50,7 @@ WebPage::WebPage(QWidget *parent) :
     connect(this, SIGNAL(showNotifier(QString, int)), dynamic_cast<MainWindow *>(topLevelWidget()), SLOT(showNotifier(QString, int)));
 
     manager = new QNetworkAccessManager(this);
-    connect(manager, SIGNAL(finished(QNetworkReply*)), this, SLOT(replyFinished(QNetworkReply*)));
+    connect(manager, SIGNAL(finished(QNetworkReply *)), this, SLOT(replyFinished(QNetworkReply *)));
 
     connect(view(), SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(customContextMenuRequested(QPoint)));
     connect(view()->pageAction(QWebPage::OpenLink), SIGNAL(triggered()), this, SLOT(actionOpenLink()));
@@ -65,6 +69,15 @@ WebPage::WebPage(QWidget *parent) :
     ui->reloadButton->setDefaultAction(ui->actionReloadPage);
     ui->backButton->setDefaultAction(ui->actionBack);
     ui->forwardButton->setDefaultAction(ui->actionForward);
+
+    if (privacy == IncognitoPrivacy)
+    {
+        setIncognito();
+    }
+    else
+    {
+        setWindowIcon(style()->standardIcon(QStyle::SP_DesktopIcon));
+    }
 }
 
 WebPage::~WebPage()
@@ -105,7 +118,7 @@ void WebPage::on_actionLoadPage_triggered()
                 url = "0.0.0.0";
             }
         }
-        if (url.scheme().isEmpty())
+        if (privacy == IncognitoPrivacy || url.scheme().isEmpty())
         {
             url.setScheme("https");
         }
@@ -192,11 +205,15 @@ void WebPage::on_webView_loadStarted()
 
 void WebPage::applyIcon()
 {
+    if (isIncognito())
+    {
+        return;
+    }
     if (QTabWidget * tw = qobject_cast<QTabWidget *>(parent()->parent()))
     {
         const int index = tw->indexOf(this);
         QIcon icon = QWebSettings::iconForUrl(current_url);
-        tw->setTabIcon(index, icon.isNull() ? style()->standardIcon(QStyle::SP_ComputerIcon) : icon);
+        tw->setTabIcon(index, icon.isNull() ? windowIcon() : icon);
     }
 }
 
@@ -370,7 +387,7 @@ void WebPage::saveReplyToDisk(QNetworkReply * reply)
     {
         qDebug() << "redirect detected" << url;
         qDebug() << "creating hidden page";
-        WebPage * redirect_page = new WebPage(this);
+        WebPage * redirect_page = new WebPage(privacy, this);
         redirect_page->hide();
         redirect_page->setProperty("requested_url", url);
         redirect_page->setProperty("temporary", true);
@@ -485,5 +502,20 @@ void WebPage::unsupportedContent(QNetworkReply * reply)
 void WebPage::featurePermissionRequested(QWebFrame* frame, QWebPage::Feature feature)
 {
     page()->setFeaturePermission(frame, feature, QWebPage::PermissionDeniedByUser);
+}
+
+void WebPage::setIncognito()
+{
+    setWindowIcon(style()->standardIcon(QStyle::SP_VistaShield));
+
+    QWebSettings * settings = view()->settings();
+    settings->setAttribute(QWebSettings::JavascriptEnabled, false);
+    settings->setAttribute(QWebSettings::PrivateBrowsingEnabled, true);
+    settings->setThirdPartyCookiePolicy(QWebSettings::AlwaysBlockThirdPartyCookies);
+}
+
+bool WebPage::isIncognito() const
+{
+    return privacy == IncognitoPrivacy;
 }
 

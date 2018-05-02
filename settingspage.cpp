@@ -17,6 +17,7 @@ SettingsPage::SettingsPage(QWidget *parent) :
     ui(new Ui::SettingsPage)
 {
     qRegisterMetaType<SettingsPage::ProxyType>("SettingsPage::ProxyType");
+    qRegisterMetaType<SettingsPage::Privacy>("SettingsPage::Privacy");
 
     ui->setupUi(this);
 
@@ -41,7 +42,14 @@ SettingsPage::SettingsPage(QWidget *parent) :
     ui->saveAsk->setChecked(save_policy == SaveAsk);
     ui->saveSilent->setChecked(save_policy == SaveSilent);
     ui->savePath->setText(savePath());
+    ui->browseButton->setIcon(style()->standardIcon(QStyle::SP_DirOpenIcon));
     ui->writeMetadata->setChecked(writeMetadataEnabed());
+
+    Privacy privacy = privacyPolicy();
+    ui->privacyDefaultUsual->setChecked(privacy == UsualPrivacy);
+    ui->privacyDefaultIncognito->setChecked(privacy == IncognitoPrivacy);
+    ui->useragentString->setText(useragentString());
+    ui->defaultUseragentString->setIcon(style()->standardIcon(QStyle::SP_LineEditClearButton));
 }
 
 SettingsPage::~SettingsPage()
@@ -105,6 +113,8 @@ void SettingsPage::databaseInit(QSqlDatabase & db)
     setCurrentSavePath(download_location);
     setSavePath(download_location + "/meow");
     setWriteMetadataEnabled(true);
+    setUseragentString(QString());
+    setPrivacyPolicy(UsualPrivacy);
 }
 
 bool SettingsPage::setValue(QString field, QString value, QString _namespace)
@@ -283,9 +293,30 @@ bool SettingsPage::setWriteMetadataEnabled(bool state)
 {
     return setValue("WriteMetadata", QString::number(state));
 }
+
 bool SettingsPage::writeMetadataEnabed()
 {
     return value("WriteMetadata").toInt() != 0;
+}
+
+bool SettingsPage::setPrivacyPolicy(Privacy privacy)
+{
+    return setValue("PrivacyPolicy", QString::number(privacy));
+}
+
+SettingsPage::Privacy SettingsPage::privacyPolicy()
+{
+    return (Privacy)value("PrivacyPolicy").toInt();
+}
+
+bool SettingsPage::setUseragentString(QString str)
+{
+    return setValue("Useragent", str);
+}
+
+QString SettingsPage::useragentString()
+{
+    return value("Useragent");
 }
 
 void SettingsPage::on_pageEmpty_toggled(bool checked)
@@ -408,4 +439,32 @@ void SettingsPage::on_browseButton_clicked()
 void SettingsPage::on_writeMetadata_toggled(bool checked)
 {
     setWriteMetadataEnabled(checked);
+}
+
+void SettingsPage::on_privacyDefaultUsual_toggled(bool checked)
+{
+    if (checked)
+    {
+        setPrivacyPolicy(UsualPrivacy);
+        emit privacyChanged(UsualPrivacy);
+    }
+}
+
+void SettingsPage::on_privacyDefaultIncognito_toggled(bool checked)
+{
+    if (checked)
+    {
+        setPrivacyPolicy(IncognitoPrivacy);
+        emit privacyChanged(IncognitoPrivacy);
+    }
+}
+
+void SettingsPage::on_useragentString_editingFinished()
+{
+    setUseragentString(ui->useragentString->text());
+}
+
+void SettingsPage::on_defaultUseragentString_clicked()
+{
+    setUseragentString(QString());
 }

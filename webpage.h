@@ -9,6 +9,7 @@
 #include <QNetworkReply>
 
 #include "filemetadata.h"
+#include "settingspage.h"
 
 namespace Ui {
 class WebPage;
@@ -19,10 +20,12 @@ class WebPage : public QWidget
     Q_OBJECT
 
 public:
-    explicit WebPage(QWidget *parent = 0);
+    enum Privacy {UsualPrivacy = SettingsPage::UsualPrivacy, IncognitoPrivacy = SettingsPage::IncognitoPrivacy};
+    explicit WebPage(Privacy _privacy = UsualPrivacy, QWidget *parent = 0);
     ~WebPage();
     QWebView * view() const;
     QWebPage * page() const;
+    bool isIncognito() const;
 private slots:
     void on_actionLoadPage_triggered();
     void on_actionReloadPage_triggered();
@@ -54,6 +57,8 @@ private:
     QPoint current_pos;
     QNetworkAccessManager * manager;
     FileMetadata fmeta;
+    Privacy privacy;
+    void setIncognito();
     void applyIcon();
     void applyTitle();
     QWebHitTestResult hitTest(QPoint) const;

@@ -24,6 +24,7 @@ public:
 
 private slots:
     void on_actionAddTab_triggered();
+    void on_actionAddIncognitoTab_triggered();
     void on_tabWidget_tabCloseRequested(int index);
     void newWindowLink(QUrl);
     void linkHovered(const QString & link, const QString & title, const QString & textContent);
@@ -31,6 +32,7 @@ private slots:
     void hideNotifier();
     void on_actionShowSettings_triggered();
     void proxyChanged(SettingsPage::ProxyType);
+    void privacyChanged(SettingsPage::Privacy);
 private:
     Ui::MainWindow *ui;
     QString temp_dir;
@@ -39,6 +41,7 @@ private:
     QLabel * notifier;
     QTimer * notifier_timer;
     QScrollArea * settings_page;
+    QToolButton * add_tab;
     void openLastPages();
     void saveLastPages();
     void openHomePage();

@@ -28,6 +28,7 @@ MainWindow::MainWindow(QWidget *parent) :
     proxyChanged(SettingsPage::proxyType());
 
     QWebSettings::globalSettings()->setAttribute(QWebSettings::DeveloperExtrasEnabled, true);
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::DnsPrefetchEnabled, true);
 
     ui->setupUi(this);
     ui->mainToolBar->hide();
@@ -39,23 +40,25 @@ MainWindow::MainWindow(QWidget *parent) :
 
     setWindowIcon(style()->standardIcon(QStyle::SP_ComputerIcon));
     ui->actionAddTab->setIcon(style()->standardIcon(QStyle::SP_DirHomeIcon));
+    ui->actionAddIncognitoTab->setIcon(style()->standardIcon(QStyle::SP_VistaShield));
     ui->actionShowSettings->setIcon(style()->standardIcon(QStyle::SP_DriveNetIcon));
 
     newtab_menu.addAction(ui->actionAddTab);
+    newtab_menu.addAction(ui->actionAddIncognitoTab);
     newtab_menu.addSeparator();
     newtab_menu.addAction(ui->actionShowSettings);
 
     // taken from https://stackoverflow.com/questions/19975137/how-can-i-add-a-new-tab-button-next-to-the-tabs-of-a-qmdiarea-in-tabbed-view-m/27127109#27127109
-    QToolButton *tb = new QToolButton();
-    tb->setToolButtonStyle(Qt::ToolButtonIconOnly);
-    tb->setPopupMode(QToolButton::MenuButtonPopup);
-    tb->setDefaultAction(ui->actionAddTab);
-    tb->setMenu(& newtab_menu);
+    add_tab = new QToolButton();
+    add_tab->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    add_tab->setPopupMode(QToolButton::MenuButtonPopup);
+    add_tab->setDefaultAction(SettingsPage::privacyPolicy() == SettingsPage::UsualPrivacy ? ui->actionAddTab : ui->actionAddIncognitoTab);
+    add_tab->setMenu(& newtab_menu);
     // Add empty, not enabled tab to tabWidget
     ui->tabWidget->addTab(new QWidget(), QString());
     ui->tabWidget->setTabEnabled(0, false);
     // Add tab button to current tab. Button will be enabled, but tab -- not
-    TabWidgetOpener::tabBar(ui->tabWidget)->setTabButton(0, QTabBar::RightSide, tb);
+    TabWidgetOpener::tabBar(ui->tabWidget)->setTabButton(0, QTabBar::RightSide, add_tab);
 
     QWebSettings::enablePersistentStorage(SettingsPage::tempDir());
 
@@ -82,9 +85,20 @@ MainWindow::~MainWindow()
 void MainWindow::on_actionAddTab_triggered()
 {
     int index = ui->tabWidget->count() - 1;
-    ui->tabWidget->insertTab(index, last_page = new WebPage(this), QString());
+    ui->tabWidget->insertTab(index, last_page = new WebPage(WebPage::UsualPrivacy, this), QString());
     ui->tabWidget->setCurrentIndex(index);
-    ui->tabWidget->setTabIcon(index, style()->standardIcon(QStyle::SP_ComputerIcon));
+    ui->tabWidget->setTabIcon(index, last_page->windowIcon());
+
+    connect(last_page, SIGNAL(newWindowLink(QUrl)), this, SLOT(newWindowLink(QUrl)));
+    connect(last_page, SIGNAL(linkHovered(QString, QString, QString)), this, SLOT(linkHovered(QString, QString, QString)));
+}
+
+void MainWindow::on_actionAddIncognitoTab_triggered()
+{
+    int index = ui->tabWidget->count() - 1;
+    ui->tabWidget->insertTab(index, last_page = new WebPage(WebPage::IncognitoPrivacy, this), QString());
+    ui->tabWidget->setCurrentIndex(index);
+    ui->tabWidget->setTabIcon(index, last_page->windowIcon());
 
     connect(last_page, SIGNAL(newWindowLink(QUrl)), this, SLOT(newWindowLink(QUrl)));
     connect(last_page, SIGNAL(linkHovered(QString, QString, QString)), this, SLOT(linkHovered(QString, QString, QString)));
@@ -111,7 +125,19 @@ void MainWindow::on_tabWidget_tabCloseRequested(int index)
 
 void MainWindow::newWindowLink(QUrl url)
 {
-    ui->actionAddTab->trigger();
+    bool incognito = false;
+    if (WebPage * webpage = dynamic_cast<WebPage *>(sender()))
+    {
+        incognito = webpage->isIncognito();
+    }
+    if (!incognito)
+    {
+        ui->actionAddTab->trigger();
+    }
+    else
+    {
+        ui->actionAddIncognitoTab->trigger();
+    }
     last_page->view()->load(url);
 }
 
@@ -173,6 +199,7 @@ void MainWindow::on_actionShowSettings_triggered()
     settings_page->setAlignment(Qt::AlignHCenter);
     settings_page->setWidget(page = new SettingsPage());
     connect(page, SIGNAL(proxyChanged(SettingsPage::ProxyType)), this, SLOT(proxyChanged(SettingsPage::ProxyType)));
+    connect(page, SIGNAL(privacyChanged(SettingsPage::Privacy)), this, SLOT(privacyChanged(SettingsPage::Privacy)));
 }
 
 void MainWindow::proxyChanged(SettingsPage::ProxyType proxy_type)
@@ -218,7 +245,10 @@ void MainWindow::saveLastPages()
     {
         if (WebPage * webpage = dynamic_cast<WebPage *>(ui->tabWidget->widget(i)))
         {
-            list << webpage->view()->url().toString();
+            if (!webpage->isIncognito())
+            {
+                list << webpage->view()->url().toString();
+            }
         }
     }
     SettingsPage::setLastPages(list);
@@ -233,3 +263,10 @@ void MainWindow::openEmptyPage()
 {
     ui->actionAddTab->trigger();
 }
+
+void MainWindow::privacyChanged(SettingsPage::Privacy _privacy)
+{
+    add_tab->setDefaultAction(_privacy == SettingsPage::UsualPrivacy ? ui->actionAddTab : ui->actionAddIncognitoTab);
+}
+
+
