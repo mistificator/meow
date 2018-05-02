@@ -62,12 +62,14 @@ struct FileMetadata::Data
     {
         switch (tag)
         {
-        case FileMetadata::TagImageTitle:
         case FileMetadata::TagDocumentName:
         case FileMetadata::TagImageDescription:
         case FileMetadata::TagExifUserComment:
             return PropertyTagTypeASCII;
+        case FileMetadata::TagXPTitle:
+        case FileMetadata::TagXPComment:
         case FileMetadata::TagXPKeywords:
+        case FileMetadata::TagXPSubject:
             return PropertyTagTypeByte;
         }
         return PropertyTagTypeUndefined;
@@ -99,7 +101,7 @@ bool FileMetadata::setField(int tag, QByteArray value)
     {
         return false;
     }
-    if (tag == FileMetadata::TagXPKeywords)
+    if (tag >= StartXPTag && tag <= EndXPTag)
     {
         value = QByteArray((char *)QString(value).utf16(), value.count() * sizeof(ushort)); // convert to utf16
     }
@@ -112,7 +114,7 @@ bool FileMetadata::setField(int tag, QByteArray value)
     propertyItem.type = Data::tagType(tag);
     propertyItem.length = propertyItem.type == PropertyTagTypeASCII ? count + 1 : count;
     propertyItem.value = propertyValue;
-    Status stat;
+    Status stat = GenericError;
     {
         Image image((wchar_t *)d->filename.utf16());
         stat = image.SetPropertyItem(& propertyItem);
@@ -121,12 +123,12 @@ bool FileMetadata::setField(int tag, QByteArray value)
             stat = image.Save((wchar_t *)(d->filename + "_copy").utf16(), &d->clsid); // we must save as copy, details https://msdn.microsoft.com/en-us/library/ms535407%28v=vs.85%29.aspx
             if (stat != Ok)
             {
-                qDebug() << "Bitmap::Save failed" << stat;
+                qDebug() << "Image::Save failed" << stat;
             }
         }
         else
         {
-            qDebug() << "Bitmap::SetPropertyItem failed" << stat;
+            qDebug() << "Image::SetPropertyItem failed" << stat;
         }
     }
     delete [] propertyValue;

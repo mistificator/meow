@@ -10,9 +10,7 @@
 #include <QDebug>
 #include <QNetworkProxy>
 #include <QtWebKit/QWebElement>
-#if QT_VERSION >= 0x050000
-    #include <QStandardPaths>
-#endif
+#include <QFileDialog>
 
 #include "mainwindow.h"
 #include "settingspage.h"
@@ -49,16 +47,6 @@ WebPage::WebPage(QWidget *parent) :
 
     manager = new QNetworkAccessManager(this);
     connect(manager, SIGNAL(finished(QNetworkReply*)), this, SLOT(replyFinished(QNetworkReply*)));
-
-#if QT_VERSION >= 0x050000
-    QStringList list = QStandardPaths::standardLocations(QStandardPaths::DownloadLocation);
-    if (!list.isEmpty())
-    {
-        download_location = list.front();
-    }
-#else
-    download_location = QDir::homePath();
-#endif
 
     connect(view(), SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(customContextMenuRequested(QPoint)));
     connect(view()->pageAction(QWebPage::OpenLink), SIGNAL(triggered()), this, SLOT(actionOpenLink()));
@@ -351,13 +339,13 @@ QString WebPage::adjustFilename(QString filename, const QByteArray & data)
     return filename;
 }
 
-void WebPage::modifyExif(QString filename, QUrl url, QStringList tags)
+void WebPage::modifyExif(QString filename, QUrl file_url, QUrl page_url, QStringList tags)
 {
     if (fmeta.setImage(filename))
     {
         if (
                 fmeta.setField(FileMetadata::TagXPKeywords, tags.join("; ").toLocal8Bit()) &&
-                fmeta.setField(FileMetadata::TagExifUserComment, url.toEncoded())
+                fmeta.setField(FileMetadata::TagXPComment, file_url.toEncoded() + "\n\n" + page_url.toEncoded())
             )
         {
             qDebug() << "properties of" << QFileInfo(filename).fileName() << "updated";
@@ -396,40 +384,65 @@ void WebPage::saveReplyToDisk(QNetworkReply * reply)
         filename.clear();
     }
 
+    filename = adjustFilename(filename, data);
+    QString path;
     switch (SettingsPage::savePolicy())
     {
     case SettingsPage::SaveAsk:
+        {
+            QString save_file_name = QFileDialog::getSaveFileName(topLevelWidget(), "Download file \"" + filename + "\"", SettingsPage::currentSavePath() + "/" + filename);
+            if (save_file_name.isEmpty())
+            {
+                return;
+            }
+            path = QFileInfo(save_file_name).dir().path() + "/";
+            filename = QFileInfo(save_file_name).fileName();
+            SettingsPage::setCurrentSavePath(path);
+        }
         break;
     case SettingsPage::SaveSilent:
+        {
+        //    QString dir = QFileInfo(url_adjusted).dir().path();
+            QString dir = QFileInfo(current_url.toString(QUrl::RemoveScheme | QUrl::RemovePort)).dir().path();
+            qDebug() << "download" << dir << filename << reply->isFinished();
+            path = SettingsPage::savePath() + "/" + dir + "/";
+            QDir().mkpath(path);
+        }
         break;
     }
 
-//    QString dir = QFileInfo(url_adjusted).dir().path();
-    QString dir = QFileInfo(current_url.toString(QUrl::RemoveScheme | QUrl::RemovePort)).dir().path();
-    qDebug() << "download" << dir << filename << reply->isFinished();
-    QString path = download_location + "/meow" + dir + "/";
-    QDir().mkpath(path);
-    filename = adjustFilename(filename, data);
     QFile file(path + filename);
     if (!data.isEmpty() && file.open(QFile::WriteOnly))
     {
         file.write(data);
         file.close();
 
-        modifyExif(file.fileName(), url, QStringList() << "meow" << "download");
-
-        QString link;
-        int count = 0;
-        do
+        if (SettingsPage::writeMetadataEnabed())
         {
-            link = download_location + "/meow/" + filename + (count > 0 ? "(" + QString::number(count) + ")" : "");
-    #ifdef Q_OS_WIN
-            link += ".lnk";
-    #endif
-            count++;
+            modifyExif(
+                        file.fileName(),
+                        url,
+                        current_url,
+                        QStringList() <<
+                            url.toString(QUrl::RemoveScheme | QUrl::RemovePort | QUrl::RemovePath | QUrl::RemoveQuery) <<
+                            current_url.toString(QUrl::RemoveScheme | QUrl::RemovePort | QUrl::RemovePath | QUrl::RemoveQuery));
         }
-        while (QFile::exists(link));
-        file.link(link);
+
+        if (SettingsPage::savePolicy() == SettingsPage::SaveSilent)
+        {
+            QString link;
+            int count = 0;
+            do
+            {
+                link = SettingsPage::savePath() + "/" + filename + (count > 0 ? "(" + QString::number(count) + ")" : "");
+        #ifdef Q_OS_WIN
+                link += ".lnk";
+        #endif
+                count++;
+            }
+            while (QFile::exists(link));
+            file.link(link);
+        }
 
         emit showNotifier("\"" + filename + "\" downloaded");
     }

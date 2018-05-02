@@ -53,14 +53,13 @@ private:
     QUrl current_url;
     QPoint current_pos;
     QNetworkAccessManager * manager;
-    QString download_location;
     FileMetadata fmeta;
     void applyIcon();
     void applyTitle();
     QWebHitTestResult hitTest(QPoint) const;
     static QString adjustFilename(QString filename, const QByteArray & data);
     void saveReplyToDisk(QNetworkReply * reply);
-    void modifyExif(QString filename, QUrl url, QStringList tags);
+    void modifyExif(QString filename, QUrl file_url, QUrl page_url, QStringList tags);
 protected:
     void showEvent(QShowEvent *);
 signals:

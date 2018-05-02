@@ -45,6 +45,8 @@ public:
     static QString savePath();
     static bool setCurrentSavePath(QString);
     static QString currentSavePath();
+    static bool setWriteMetadataEnabled(bool);
+    static bool writeMetadataEnabed();
 signals:
     void proxyChanged(SettingsPage::ProxyType);
 private slots:

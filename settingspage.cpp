@@ -2,10 +2,15 @@
 #include "ui_settingspage.h"
 #include <QDir>
 #include <QDebug>
-#include <QSqlQuery>
-#include <QSqlError>
+#include <QtSql/QSqlQuery>
+#include <QtSql/QSqlError>
 #include <QtWebKit/QWebSettings>
 #include <QUrl>
+#include <QFileDialog>
+
+#if QT_VERSION >= 0x050000
+    #include <QStandardPaths>
+#endif
 
 SettingsPage::SettingsPage(QWidget *parent) :
     QWidget(parent),
@@ -31,6 +36,12 @@ SettingsPage::SettingsPage(QWidget *parent) :
     ui->searchEngine->addItems(searchEngines());
     ui->searchEngine->setCurrentIndex(engine_index);
     ui->searchRemove->setIcon(style()->standardIcon(QStyle::SP_LineEditClearButton));
+
+    SavePolicy save_policy = savePolicy();
+    ui->saveAsk->setChecked(save_policy == SaveAsk);
+    ui->saveSilent->setChecked(save_policy == SaveSilent);
+    ui->savePath->setText(savePath());
+    ui->writeMetadata->setChecked(writeMetadataEnabed());
 }
 
 SettingsPage::~SettingsPage()
@@ -71,13 +82,29 @@ void SettingsPage::databaseInit(QSqlDatabase & db)
     {
         return;
     }
-    setStartPage(PageEmpty);
+    setStartPage(PageLast);
     setHomePage("https://duckduckgo.com");
     setProxyType(ProxySystem);
     setSearchEngines(QStringList() <<
                      "duckduckgo.com/?q=%1" <<
                      "google.com/search?q=%1" <<
                      "yandex.com/search/?text=%1");
+
+    QString download_location;
+#if QT_VERSION >= 0x050000
+    QStringList list = QStandardPaths::standardLocations(QStandardPaths::DownloadLocation);
+    if (!list.isEmpty())
+    {
+        download_location = list.front();
+    }
+    else
+#endif
+    {
+        download_location = QDir::homePath();
+    }
+    setCurrentSavePath(download_location);
+    setSavePath(download_location + "/meow");
+    setWriteMetadataEnabled(true);
 }
 
 bool SettingsPage::setValue(QString field, QString value, QString _namespace)
@@ -229,7 +256,7 @@ bool SettingsPage::setSavePolicy(SavePolicy policy)
 
 SettingsPage::SavePolicy SettingsPage::savePolicy()
 {
-    return value("SavePolicy");
+    return (SavePolicy)value("SavePolicy").toInt();
 }
 
 bool SettingsPage::setSavePath(QString path)
@@ -250,6 +277,15 @@ bool SettingsPage::setCurrentSavePath(QString path)
 QString SettingsPage::currentSavePath()
 {
     return value("CurrentSavePath");
+}
+
+bool SettingsPage::setWriteMetadataEnabled(bool state)
+{
+    return setValue("WriteMetadata", QString::number(state));
+}
+bool SettingsPage::writeMetadataEnabed()
+{
+    return value("WriteMetadata").toInt() != 0;
 }
 
 void SettingsPage::on_pageEmpty_toggled(bool checked)
@@ -339,25 +375,37 @@ void SettingsPage::on_searchRemove_clicked()
 
 void SettingsPage::on_saveAsk_toggled(bool checked)
 {
-
+    if (checked)
+    {
+        setSavePolicy(SaveAsk);
+    }
 }
 
 void SettingsPage::on_saveSilent_toggled(bool checked)
 {
-
+    if (checked)
+    {
+        setSavePolicy(SaveSilent);
+    }
 }
 
 void SettingsPage::on_savePath_editingFinished()
 {
-
+    setSavePath(ui->savePath->text());
 }
 
 void SettingsPage::on_browseButton_clicked()
 {
-
+    QString dir = QFileDialog::getExistingDirectory(topLevelWidget(), "Select folder for downloads");
+    if (dir.isEmpty())
+    {
+        return;
+    }
+    ui->savePath->setText(dir);
+    setSavePath(dir);
 }
 
 void SettingsPage::on_writeMetadata_toggled(bool checked)
 {
-
+    setWriteMetadataEnabled(checked);
 }
