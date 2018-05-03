@@ -13,6 +13,7 @@
 #include <QFileDialog>
 
 #include "mainwindow.h"
+#include "tabbar.h"
 
 class UserAgentWebPage : public QWebPage
 {
@@ -221,27 +222,18 @@ void WebPage::applyTitle()
 {
     if (QTabWidget * tw = qobject_cast<QTabWidget *>(parent()->parent()))
     {
-        const int index = tw->indexOf(this);
-        QString title = view()->title();
-        tw->setTabToolTip(index, title);
-        while (!title.isEmpty() && tw->fontMetrics().width(title) > 90)
+        if (TabBar * tb = qobject_cast<TabBar *>(TabWidgetOpener::tabBar(tw)))
         {
-            title = title.left(title.count() - 1);
+            const int index = tw->indexOf(this);
+            QString title = view()->title();
+            tw->setTabToolTip(index, title);
+            if (view()->url().isEmpty() || view()->url().toString().trimmed().compare("about:blank", Qt::CaseInsensitive) == 0)
+            {
+                title = "New Tab";
+                ui->webAddress->setText("");
+            }
+            tw->setTabText(index, title);
         }
-        if (title != view()->title())
-        {
-            title += "...";
-        }
-        if (view()->url().isEmpty() || view()->url().toString().trimmed().compare("about:blank", Qt::CaseInsensitive) == 0)
-        {
-            title = "New Tab";
-            ui->webAddress->setText("");
-        }
-        while (tw->fontMetrics().width(title) < 100)
-        {
-            title = title + " ";
-        }
-        tw->setTabText(index, title);
     }
 }
 
@@ -518,4 +510,3 @@ bool WebPage::isIncognito() const
 {
     return privacy == IncognitoPrivacy;
 }
-

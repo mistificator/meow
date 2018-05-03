@@ -1,18 +1,19 @@
 #include "mainwindow.h"
 #include <QApplication>
+#include <QSharedMemory>
+#include <QDebug>
 
 int main(int argc, char *argv[])
 {
+    QSharedMemory shmem("meow_single");
+    if (!shmem.create(1))
+    {
+        qDebug() << "already running";
+        return 0;
+    }
+
     // from https://habr.com/post/188816/
-    QStringList paths = QApplication::libraryPaths();
-    paths.append(".");
-    paths.append("imageformats");
-    paths.append("platforms");
-    paths.append("sqldrivers");
-    paths.append("audio");
-    paths.append("mediaservice");
-    paths.append("printsupport");
-    QApplication::setLibraryPaths(paths);
+    QApplication::setLibraryPaths(QStringList() << qApp->applicationDirPath());
 
     QApplication a(argc, argv);
     MainWindow w;

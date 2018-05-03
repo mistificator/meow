@@ -10,8 +10,9 @@
 #include "webpage.h"
 #include "settingspage.h"
 
-namespace Ui {
-class MainWindow;
+namespace Ui
+{
+    class MainWindow;
 }
 
 class MainWindow : public QMainWindow

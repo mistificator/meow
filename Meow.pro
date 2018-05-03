@@ -21,12 +21,14 @@ SOURCES += main.cpp\
         mainwindow.cpp \
         webpage.cpp \
         filemetadata.cpp \
-        settingspage.cpp
+        settingspage.cpp \
+    tabbar.cpp
 
 HEADERS  += mainwindow.h \
             webpage.h \
             filemetadata.h \
-            settingspage.h
+            settingspage.h \
+    tabbar.h
 
 FORMS    += mainwindow.ui \
             webpage.ui \

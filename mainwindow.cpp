@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "ui_mainwindow.h"
+#include "tabbar.h"
 #include <QToolButton>
 #include <QLabel>
 #include <QDir>
@@ -11,15 +12,6 @@
 #include <QGraphicsOpacityEffect>
 #include <QPropertyAnimation>
 
-class TabWidgetOpener: public QTabWidget
-{
-public:
-    static QTabBar * tabBar(QTabWidget * tw)
-    {
-        return ((TabWidgetOpener *)tw)->QTabWidget::tabBar();
-    }
-};
-
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
@@ -28,7 +20,7 @@ MainWindow::MainWindow(QWidget *parent) :
     proxyChanged(SettingsPage::proxyType());
 
     QWebSettings::globalSettings()->setAttribute(QWebSettings::DeveloperExtrasEnabled, true);
-    QWebSettings::globalSettings()->setAttribute(QWebSettings::DnsPrefetchEnabled, true);
+//    QWebSettings::globalSettings()->setAttribute(QWebSettings::DnsPrefetchEnabled, true);
 
     ui->setupUi(this);
     ui->mainToolBar->hide();
@@ -54,6 +46,12 @@ MainWindow::MainWindow(QWidget *parent) :
     add_tab->setPopupMode(QToolButton::MenuButtonPopup);
     add_tab->setDefaultAction(SettingsPage::privacyPolicy() == SettingsPage::UsualPrivacy ? ui->actionAddTab : ui->actionAddIncognitoTab);
     add_tab->setMenu(& newtab_menu);
+    // Set custom tab bar
+    bool movable = ui->tabWidget->isMovable();
+    bool closable = ui->tabWidget->tabsClosable();
+    TabWidgetOpener::setTabBar(ui->tabWidget, new TabBar(this));
+    ui->tabWidget->setMovable(movable);
+    ui->tabWidget->setTabsClosable(closable);
     // Add empty, not enabled tab to tabWidget
     ui->tabWidget->addTab(new QWidget(), QString());
     ui->tabWidget->setTabEnabled(0, false);
@@ -247,7 +245,11 @@ void MainWindow::saveLastPages()
         {
             if (!webpage->isIncognito())
             {
-                list << webpage->view()->url().toString();
+                QString url = webpage->view()->url().toString();
+                if (!url.isEmpty())
+                {
+                    list << url;
+                }
             }
         }
     }
