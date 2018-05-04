@@ -30,7 +30,7 @@ MainWindow::MainWindow(QWidget *parent) :
     notifier_timer = new QTimer(this);
     notifier_timer->setSingleShot(true);
 
-    setWindowIcon(style()->standardIcon(QStyle::SP_ComputerIcon));
+    setWindowIcon(QIcon(":/Images/16x16.png"));
     ui->actionAddTab->setIcon(style()->standardIcon(QStyle::SP_DirHomeIcon));
     ui->actionAddIncognitoTab->setIcon(style()->standardIcon(QStyle::SP_VistaShield));
     ui->actionShowSettings->setIcon(style()->standardIcon(QStyle::SP_DriveNetIcon));

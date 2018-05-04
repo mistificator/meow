@@ -27,7 +27,7 @@ public:
 
         EndXPTag = 0x9c9f
     };
-    bool setField(int tag, QByteArray value); // see tags in https://www.sno.phy.queensu.ca/~phil/exiftool/TagNames/EXIF.html
+    bool setField(int tag, QString value); // see tags in https://www.sno.phy.queensu.ca/~phil/exiftool/TagNames/EXIF.html
 private:
     struct Data;
     Data * d;

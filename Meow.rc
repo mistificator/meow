@@ -1,0 +1,45 @@
+#include <windows.h>
+#include "version.h"
+
+IDI_ICON1               ICON    DISCARDABLE     "32x32.ico"
+
+// from http://www.qtcentre.org/threads/40166-qmake-rc-file-define-version
+#define MAKESTRING(x) #x
+#define EXPANDMACROx4(y) MAKESTRING(y)
+#define VERSION_RC_STRING EXPANDMACROx4(VERSION_RC)
+#define FILE_VERSION_STRING VERSION_RC
+#define PRODUCT_VERSION_STRING VERSION_RC_STRING
+
+#define COPYRIGHT "(c) " AUTHOR_RC
+
+VS_VERSION_INFO VERSIONINFO
+        FILEVERSION VERSION_RC
+        PRODUCTVERSION VERSION_RC
+        FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+#ifdef _DEBUG
+        FILEFLAGS VS_FF_DEBUG
+#else
+        FILEFLAGS 0x0L
+#endif
+        FILEOS VOS__WINDOWS32
+        FILETYPE VFT_APP
+        FILESUBTYPE 0x0L
+        BEGIN
+                BLOCK "StringFileInfo"
+                BEGIN
+                        BLOCK "000004b0"
+                        BEGIN
+                            VALUE "CompanyName", AUTHOR_RC
+                            VALUE "FileDescription", PRODUCT_RC
+                            VALUE "FileVersion", FILE_VERSION_STRING
+                            VALUE "LegalCopyright", COPYRIGHT
+                            VALUE "OriginalFilename", BINARY_RC
+                            VALUE "ProductName", PRODUCT_RC
+                            VALUE "ProductVersion", PRODUCT_VERSION_STRING
+                        END
+                END
+                BLOCK "VarFileInfo"
+                BEGIN
+                    VALUE "Translation", 0x0, 1200
+                END
+        END

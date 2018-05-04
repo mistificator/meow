@@ -11,6 +11,8 @@
 #include <QNetworkProxy>
 #include <QtWebKit/QWebElement>
 #include <QFileDialog>
+#include <QImageReader>
+#include <QBuffer>
 
 #include "mainwindow.h"
 #include "tabbar.h"
@@ -58,8 +60,8 @@ WebPage::WebPage(Privacy _privacy, QWidget *parent) :
     connect(view()->pageAction(QWebPage::OpenLinkInNewWindow), SIGNAL(triggered()), this, SLOT(actionOpenLinkInNewWindow()));
     connect(view()->pageAction(QWebPage::OpenFrameInNewWindow), SIGNAL(triggered()), this, SLOT(actionOpenFrameInNewWindow()));
     connect(view()->pageAction(QWebPage::OpenImageInNewWindow), SIGNAL(triggered()), this, SLOT(actionOpenImageInNewWindow()));
-    //connect(view()->pageAction(QWebPage::DownloadLinkToDisk), SIGNAL(triggered()), this, SLOT(actionDownloadLinkToDisk()));
-    //connect(view()->pageAction(QWebPage::DownloadImageToDisk), SIGNAL(triggered()), this, SLOT(actionDownloadImageToDisk()));
+    connect(view()->pageAction(QWebPage::DownloadLinkToDisk), SIGNAL(triggered()), this, SLOT(actionDownloadLinkToDisk()));
+    connect(view()->pageAction(QWebPage::DownloadImageToDisk), SIGNAL(triggered()), this, SLOT(actionDownloadImageToDisk()));
 
     ui->actionLoadPage->setIcon(style()->standardIcon(QStyle::SP_CommandLink));
     ui->actionReloadPage->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
@@ -119,7 +121,7 @@ void WebPage::on_actionLoadPage_triggered()
                 url = "0.0.0.0";
             }
         }
-        if (privacy == IncognitoPrivacy || url.scheme().isEmpty())
+        if ((privacy == IncognitoPrivacy && url.scheme().compare("http", Qt::CaseInsensitive) == 0) || url.scheme().isEmpty())
         {
             url.setScheme("https");
         }
@@ -131,7 +133,6 @@ void WebPage::on_actionReloadPage_triggered()
 {
     if (view()->url() == current_url)
     {
-//        view()->reload();
         view()->triggerPageAction(QWebPage::ReloadAndBypassCache);
     }
     else
@@ -225,7 +226,7 @@ void WebPage::applyTitle()
         if (TabBar * tb = qobject_cast<TabBar *>(TabWidgetOpener::tabBar(tw)))
         {
             const int index = tw->indexOf(this);
-            QString title = view()->title();
+            QString title = current_page_title = view()->title();
             tw->setTabToolTip(index, title);
             if (view()->url().isEmpty() || view()->url().toString().trimmed().compare("about:blank", Qt::CaseInsensitive) == 0)
             {
@@ -303,25 +304,19 @@ void WebPage::actionOpenImageInNewWindow()
         emit newWindowLink(url);
     }
 }
-/*
+
 void WebPage::actionDownloadLinkToDisk()
 {
-    QUrl url = hitTest(current_pos).linkUrl();
-    if (!url.isEmpty() && url.isValid())
-    {
-        downloadRequested(QNetworkRequest(url));
-    }
+    QWebHitTestResult res = hitTest(current_pos);
+    current_alt_text = res.element().toPlainText();
 }
 
 void WebPage::actionDownloadImageToDisk()
 {
-    QUrl url = hitTest(current_pos).imageUrl();
-    if (!url.isEmpty() && url.isValid())
-    {
-        downloadRequested(QNetworkRequest(url));
-    }
+    QWebHitTestResult res = hitTest(current_pos);
+    current_alt_text = res.element().attribute("alt");
 }
-*/
+
 QString WebPage::adjustFilename(QString filename, const QByteArray & data)
 {
     if (filename.isEmpty())
@@ -330,14 +325,12 @@ QString WebPage::adjustFilename(QString filename, const QByteArray & data)
     }
     if (QFileInfo(filename).suffix().isEmpty())
     {
-        if (data.startsWith("\xff\xd8\xff\xe0") || data.startsWith("\xff\xd8\xff\xe1"))
+        QBuffer buf;
+        buf.setData(data);
+        QImageReader img(& buf);
+        if (img.canRead())
         {
-            filename += ".jpg";
-        }
-        else
-        if (data.startsWith("\x89PNG"))
-        {
-            filename += ".png";
+            filename += "." + img.format();
         }
         else
         if (data.trimmed().startsWith("<"))
@@ -350,11 +343,13 @@ QString WebPage::adjustFilename(QString filename, const QByteArray & data)
 
 void WebPage::modifyExif(QString filename, QUrl file_url, QUrl page_url, QStringList tags)
 {
+    tags.removeDuplicates();
     if (fmeta.setImage(filename))
-    {
+    {        
+        qDebug() << filename << tags << file_url << page_url;
         if (
-                fmeta.setField(FileMetadata::TagXPKeywords, tags.join("; ").toLocal8Bit()) &&
-                fmeta.setField(FileMetadata::TagXPComment, file_url.toEncoded() + "\n\n" + page_url.toEncoded())
+                fmeta.setField(FileMetadata::TagXPKeywords, tags.join("; ")) &&
+                fmeta.setField(FileMetadata::TagExifUserComment, file_url.toString() + "\n\n" + page_url.toString())
             )
         {
             qDebug() << "properties of" << QFileInfo(filename).fileName() << "updated";
@@ -372,7 +367,7 @@ void WebPage::modifyExif(QString filename, QUrl file_url, QUrl page_url, QString
 
 void WebPage::saveReplyToDisk(QNetworkReply * reply)
 {
-    QByteArray data = reply->readAll();
+    const QByteArray & data = reply->readAll();
     QUrl url = reply->url();
 
     if (data.trimmed().startsWith("<"))
@@ -388,7 +383,7 @@ void WebPage::saveReplyToDisk(QNetworkReply * reply)
     }
     QString url_adjusted = url.toString(QUrl::RemoveScheme | QUrl::RemovePort);
     QString filename = QFileInfo(url_adjusted).fileName();
-    if (filename.contains(QRegExp("[&,\\:?]")))
+    if (filename.contains(undesiredSymbols()))
     {
         filename.clear();
     }
@@ -433,8 +428,11 @@ void WebPage::saveReplyToDisk(QNetworkReply * reply)
                         url,
                         current_url,
                         QStringList() <<
-                            url.toString(QUrl::RemoveScheme | QUrl::RemovePort | QUrl::RemovePath | QUrl::RemoveQuery) <<
-                            current_url.toString(QUrl::RemoveScheme | QUrl::RemovePort | QUrl::RemovePath | QUrl::RemoveQuery));
+                            current_page_title.replace(undesiredSymbols(), QString()) <<
+                            current_alt_text.replace(undesiredSymbols(), QString()) <<
+                            current_url.toString(QUrl::RemoveScheme | QUrl::RemovePort | QUrl::RemovePath | QUrl::RemoveQuery).replace(undesiredSymbols(), QString()) <<
+                            url.toString(QUrl::RemoveScheme | QUrl::RemovePort | QUrl::RemovePath | QUrl::RemoveQuery).replace(undesiredSymbols(), QString())
+                        );
         }
 
         if (SettingsPage::savePolicy() == SettingsPage::SaveSilent)
@@ -475,13 +473,14 @@ void WebPage::replyFinished(QNetworkReply * reply)
 
 void WebPage::initialLayoutCompleted()
 {
-    update();
+//    update();
 }
 
 void WebPage::downloadRequested(const QNetworkRequest & request)
 {
     qDebug() << "request" << request.url();
-    manager->get(request);
+    QNetworkReply * reply = manager->get(request);
+    connect(reply, SIGNAL(downloadProgress(qint64,qint64)), this, SLOT(updownProgress(qint64,qint64)));
 }
 
 void WebPage::unsupportedContent(QNetworkReply * reply)
@@ -509,4 +508,14 @@ void WebPage::setIncognito()
 bool WebPage::isIncognito() const
 {
     return privacy == IncognitoPrivacy;
+}
+
+QRegExp WebPage::undesiredSymbols(QString str) const
+{
+    return QRegExp("[" + str + "]");
+}
+
+void WebPage::updownProgress(qint64 processed, qint64 total)
+{
+    qDebug() << "updown" << processed << "/" + total;
 }

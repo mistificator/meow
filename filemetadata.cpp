@@ -27,36 +27,39 @@ struct FileMetadata::Data
     // from https://msdn.microsoft.com/ru-ru/library/windows/desktop/ms533843%28v=vs.85%29.aspx
     static int GetEncoderClsid(const WCHAR* format, CLSID* pClsid)
     {
-       UINT  num = 0;          // number of image encoders
-       UINT  size = 0;         // size of the image encoder array in bytes
+        UINT  num = 0;          // number of image encoders
+        UINT  size = 0;         // size of the image encoder array in bytes
 
-       ImageCodecInfo * pImageCodecInfo = NULL;
+        ImageCodecInfo * pImageCodecInfo = NULL;
 
-       GetImageEncodersSize(&num, &size);
-       if(size == 0)
-       {
-          return -1;  // Failure
-       }
+        GetImageEncodersSize(&num, &size);
+        if (size == 0)
+        {
+            qDebug() << "GetImageEncodersSize size == 0";
+            return -1;  // Failure
+        }
 
-       pImageCodecInfo = (ImageCodecInfo*)(malloc(size));
-       if(pImageCodecInfo == NULL)
-       {
-          return -1;  // Failure
-       }
-       GetImageEncoders(num, size, pImageCodecInfo);
+        pImageCodecInfo = (ImageCodecInfo*)(malloc(size));
+        if(pImageCodecInfo == NULL)
+        {
+            return -1;  // Failure
+        }
+        GetImageEncoders(num, size, pImageCodecInfo);
 
-       for(UINT j = 0; j < num; ++j)
-       {
-          if( wcscmp(pImageCodecInfo[j].MimeType, format) == 0 )
-          {
-             *pClsid = pImageCodecInfo[j].Clsid;
-             free(pImageCodecInfo);
-             return j;  // Success
-          }
-       }
+        for(UINT j = 0; j < num; ++j)
+        {
+            if( wcscmp(pImageCodecInfo[j].MimeType, format) == 0 )
+            {
+                *pClsid = pImageCodecInfo[j].Clsid;
+                free(pImageCodecInfo);
+                return j;  // Success
+            }
+        }
 
-       free(pImageCodecInfo);
-       return -1;  // Failure
+        qDebug() << "format not supported - " << QString::fromUtf16((ushort *)format);
+
+        free(pImageCodecInfo);
+        return -1;  // Failure
     }
     static int tagType(int tag)
     {
@@ -95,20 +98,25 @@ bool FileMetadata::setImage(QString filename)
     return d->image_set_up;
 }
 
-bool FileMetadata::setField(int tag, QByteArray value)
+bool FileMetadata::setField(int tag, QString value)
 {
     if (!d->image_set_up)
     {
         return false;
     }
+    QByteArray ba_value;
     if (tag >= StartXPTag && tag <= EndXPTag)
     {
-        value = QByteArray((char *)QString(value).utf16(), value.count() * sizeof(ushort)); // convert to utf16
+        ba_value = QByteArray((char *)value.utf16(), value.count() * sizeof(ushort)); // convert to utf16
     }
-    const int count = value.count();
+    else
+    {
+        ba_value = value.toUtf8();
+    }
+    const int count = ba_value.count();
     char * propertyValue = new char[count + sizeof(ushort)];
     propertyValue[count] = 0; propertyValue[count + 1] = 0;
-    memcpy(propertyValue, value.constData(), value.count());
+    memcpy(propertyValue, ba_value.constData(), count);
     PropertyItem propertyItem;
     propertyItem.id = tag;
     propertyItem.type = Data::tagType(tag);

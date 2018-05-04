@@ -28,8 +28,18 @@ HEADERS  += mainwindow.h \
             webpage.h \
             filemetadata.h \
             settingspage.h \
-    tabbar.h
+    tabbar.h \
+    version.h
 
 FORMS    += mainwindow.ui \
             webpage.ui \
             settingspage.ui
+
+win32:
+{
+    DISTFILES += Meow.rc
+    RC_FILE += Meow.rc
+}
+
+RESOURCES += \
+    meow.qrc

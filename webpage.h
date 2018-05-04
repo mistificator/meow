@@ -42,8 +42,8 @@ private slots:
     void actionOpenLinkInNewWindow();
     void actionOpenFrameInNewWindow();
     void actionOpenImageInNewWindow();
-//    void actionDownloadLinkToDisk();
-//    void actionDownloadImageToDisk();
+    void actionDownloadLinkToDisk();
+    void actionDownloadImageToDisk();
 
     void replyFinished(QNetworkReply *);
     void linkClicked(QUrl);
@@ -51,10 +51,14 @@ private slots:
     void downloadRequested(const QNetworkRequest & request);
     void unsupportedContent(QNetworkReply * reply);
     void featurePermissionRequested(QWebFrame* frame, QWebPage::Feature feature);
+
+    void updownProgress(qint64 processed, qint64 total);
 private:
     Ui::WebPage *ui;
     QUrl current_url;
     QPoint current_pos;
+    QString current_page_title;
+    QString current_alt_text;
     QNetworkAccessManager * manager;
     FileMetadata fmeta;
     Privacy privacy;
@@ -65,6 +69,7 @@ private:
     static QString adjustFilename(QString filename, const QByteArray & data);
     void saveReplyToDisk(QNetworkReply * reply);
     void modifyExif(QString filename, QUrl file_url, QUrl page_url, QStringList tags);
+    QRegExp undesiredSymbols(QString str = "\"&,\\:?/") const;
 protected:
     void showEvent(QShowEvent *);
 signals:

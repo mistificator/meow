@@ -9,13 +9,15 @@ class TabBar : public QTabBar
     Q_OBJECT
 public:
     TabBar(QWidget * _parent = 0);
+    void setMaximumTabSize(int);
+    int maximumTabSize() const;
 protected:
-    bool eventFilter(QObject *watched, QEvent *event);
-    QSize tabSizeHint(int index) const;
+    virtual bool eventFilter(QObject *watched, QEvent *event);
+    virtual QSize tabSizeHint(int index) const;
+    virtual void tabLayoutChange();
 private:
-    mutable int cachedHeight;
-private slots:
-    void rescale();
+    mutable int cached_height;
+    int max_tab_size;
 };
 
 class TabWidgetOpener: public QTabWidget
