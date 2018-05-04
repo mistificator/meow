@@ -36,7 +36,8 @@ protected:
 WebPage::WebPage(Privacy _privacy, QWidget *parent) :
     QWidget(parent),
     ui(new Ui::WebPage),
-    privacy(_privacy)
+    privacy(_privacy),
+    script("// sample script\r\document.title = \"This is the new page title.\";")
 {
     ui->setupUi(this);
 
@@ -238,10 +239,23 @@ void WebPage::applyTitle()
     }
 }
 
+#include <QInputDialog>
 void WebPage::customContextMenuRequested(const QPoint & pos)
 {
     QMenu * menu = page()->createStandardContextMenu();
-    menu->exec(mapToGlobal(current_pos = pos));
+    menu->addSeparator();
+    QAction * js_action = menu->addAction("Run script");
+    QAction * result = menu->exec(mapToGlobal(current_pos = pos));
+    if (result == js_action)
+    {
+        bool ok = false;
+        QString new_script;
+        page()->mainFrame()->evaluateJavaScript(new_script = QInputDialog::getMultiLineText(topLevelWidget(), "Run Javascript code", "Javascript code", script, & ok));
+        if (ok)
+        {
+            script = new_script;
+        }
+    }
     menu->deleteLater();
 }
 

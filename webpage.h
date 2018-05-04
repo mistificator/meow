@@ -62,6 +62,7 @@ private:
     QNetworkAccessManager * manager;
     FileMetadata fmeta;
     Privacy privacy;
+    QString script;
     void setIncognito();
     void applyIcon();
     void applyTitle();
