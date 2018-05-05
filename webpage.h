@@ -7,6 +7,7 @@
 #include <QtWebKitWidgets/QWebView>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QtWebKitWidgets/QWebInspector>
 
 #include "filemetadata.h"
 #include "settingspage.h"
@@ -44,6 +45,7 @@ private slots:
     void actionOpenImageInNewWindow();
     void actionDownloadLinkToDisk();
     void actionDownloadImageToDisk();
+    void actionInspectElement();
 
     void replyFinished(QNetworkReply *);
     void linkClicked(QUrl);
@@ -63,6 +65,7 @@ private:
     FileMetadata fmeta;
     Privacy privacy;
     QString script;
+    QWebInspector * inspector;
     void setIncognito();
     void applyIcon();
     void applyTitle();

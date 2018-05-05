@@ -41,7 +41,7 @@ WebPage::WebPage(Privacy _privacy, QWidget *parent) :
 {
     ui->setupUi(this);
 
-    view()->setPage(new UserAgentWebPage());
+    view()->setPage(new UserAgentWebPage());    
     page()->setLinkDelegationPolicy(QWebPage::DelegateAllLinks);
     page()->setForwardUnsupportedContent(true);
 
@@ -50,6 +50,12 @@ WebPage::WebPage(Privacy _privacy, QWidget *parent) :
     connect(page()->mainFrame(), SIGNAL(initialLayoutCompleted()), this, SLOT(initialLayoutCompleted()));
     connect(page(), SIGNAL(downloadRequested(QNetworkRequest)), this, SLOT(downloadRequested(QNetworkRequest)));
     connect(page(), SIGNAL(unsupportedContent(QNetworkReply*)), this, SLOT(unsupportedContent(QNetworkReply*)));
+    connect(page(), SIGNAL(loadProgress(int)), ui->progressBar, SLOT(setValue(int)));
+
+    inspector = new QWebInspector();
+    inspector->setPage(page());
+    ui->dockWidget->setWidget(inspector);
+    ui->dockWidget->hide();
 
     connect(this, SIGNAL(showNotifier(QString, int)), dynamic_cast<MainWindow *>(topLevelWidget()), SLOT(showNotifier(QString, int)));
 
@@ -63,6 +69,7 @@ WebPage::WebPage(Privacy _privacy, QWidget *parent) :
     connect(view()->pageAction(QWebPage::OpenImageInNewWindow), SIGNAL(triggered()), this, SLOT(actionOpenImageInNewWindow()));
     connect(view()->pageAction(QWebPage::DownloadLinkToDisk), SIGNAL(triggered()), this, SLOT(actionDownloadLinkToDisk()));
     connect(view()->pageAction(QWebPage::DownloadImageToDisk), SIGNAL(triggered()), this, SLOT(actionDownloadImageToDisk()));
+    connect(view()->pageAction(QWebPage::InspectElement), SIGNAL(triggered()), this, SLOT(actionInspectElement()));
 
     ui->actionLoadPage->setIcon(style()->standardIcon(QStyle::SP_CommandLink));
     ui->actionReloadPage->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
@@ -174,9 +181,11 @@ void WebPage::on_webView_loadFinished(bool status)
     else
     {
         qDebug() << "loading failed!!!";
-        page()->mainFrame()->setHtml("<html><body><div style=\"position: absolute; top: 0;bottom: 0; left: 0; right: 0; margin: auto; width: 200px; height: 100px;\"><h1>Loading failed</h1></div></body></html>");
+        page()->mainFrame()->setHtml("<html><body><div style=\"position: absolute; top: 0;bottom: 0; left: 0; right: 0; margin: auto; width: 200px; height: 100px;\"><h1>Loading failed</h1></div></body></html>", view()->url());
     }
     applyIcon();
+    ui->progressBar->setValue(0);
+    ui->dockWidget->setWindowTitle("Web inspector - " + view()->url().toString());
 }
 
 void WebPage::on_webView_titleChanged(const QString &)
@@ -244,9 +253,9 @@ void WebPage::customContextMenuRequested(const QPoint & pos)
 {
     QMenu * menu = page()->createStandardContextMenu();
     menu->addSeparator();
-    QAction * js_action = menu->addAction("Run script");
+    QAction * js_action = isIncognito() ? 0 : menu->addAction("Run script");
     QAction * result = menu->exec(mapToGlobal(current_pos = pos));
-    if (result == js_action)
+    if (js_action && result == js_action)
     {
         bool ok = false;
         QString new_script;
@@ -483,11 +492,13 @@ void WebPage::replyFinished(QNetworkReply * reply)
         qDebug() << "deleting hidden page";
         deleteLater();
     }
+    ui->progressBar->setValue(0);
 }
 
 void WebPage::initialLayoutCompleted()
 {
-//    update();
+    ui->dockWidget->setWindowTitle("Web inspector - " + view()->url().toString());
+    page()->mainFrame()->evaluateJavaScript(SettingsPage::userScript());
 }
 
 void WebPage::downloadRequested(const QNetworkRequest & request)
@@ -532,4 +543,13 @@ QRegExp WebPage::undesiredSymbols(QString str) const
 void WebPage::updownProgress(qint64 processed, qint64 total)
 {
     qDebug() << "updown" << processed << "/" + total;
+    if (total > 0)
+    {
+        ui->progressBar->setValue(ui->progressBar->maximum() * processed / total);
+    }
+}
+
+void WebPage::actionInspectElement()
+{
+    ui->dockWidget->show();
 }

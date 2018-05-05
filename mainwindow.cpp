@@ -59,6 +59,7 @@ MainWindow::MainWindow(QWidget *parent) :
     TabWidgetOpener::tabBar(ui->tabWidget)->setTabButton(0, QTabBar::RightSide, add_tab);
 
     QWebSettings::enablePersistentStorage(SettingsPage::tempDir());
+    SettingsPage::loadScripts();
 
     switch (SettingsPage::startPage())
     {

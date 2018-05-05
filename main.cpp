@@ -2,6 +2,17 @@
 #include <QApplication>
 #include <QSharedMemory>
 #include <QDebug>
+#include <QLibrary>
+#include <QMessageBox>
+#include "settingspage.h"
+
+typedef void (* WTFCrashHookFunction)();
+typedef void (* WTFSetCrashHookFunction)(WTFCrashHookFunction);
+void WTFCrashHook()
+{
+    qDebug() << "Webkit BAD BEEF!!!";
+    QMessageBox::critical(0, "Fatal WebKit error", "Application will be closed");
+}
 
 int main(int argc, char *argv[])
 {
@@ -12,12 +23,25 @@ int main(int argc, char *argv[])
         return 0;
     }
 
-    // from https://habr.com/post/188816/
-    QApplication::setLibraryPaths(QStringList() << qApp->applicationDirPath());
+#if defined(Q_OS_WIN) && defined(_DEBUG)
+    WTFSetCrashHookFunction WTFSetCrashHook = (WTFSetCrashHookFunction)QLibrary::resolve("Qt5WebKitd", "WTFSetCrashHook");
+    if (WTFSetCrashHook)
+    {
+        WTFSetCrashHook(WTFCrashHook);
+    }
+#endif
 
     QApplication a(argc, argv);
+
+    if (SettingsPage::value("FatalExit").toInt() != 0 && SettingsPage::startPage() == SettingsPage::PageLast)
+    {
+        SettingsPage::setLastPages(QStringList());
+    }
+    SettingsPage::setValue("FatalExit", "1");
+
     MainWindow w;
     w.show();
+    int code = a.exec();
 
-    return a.exec();
+    SettingsPage::setValue("FatalExit", QString::number(code));
 }

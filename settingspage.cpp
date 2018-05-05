@@ -7,10 +7,16 @@
 #include <QtWebKit/QWebSettings>
 #include <QUrl>
 #include <QFileDialog>
+#include <QtWebKitWidgets/QWebPage>
+#include <QtWebKitWidgets/QWebFrame>
+#include <QDesktopServices>
 
 #if QT_VERSION >= 0x050000
     #include <QStandardPaths>
 #endif
+
+int SettingsPage::loaded_scripts_count = 0;
+QString SettingsPage::user_script;
 
 SettingsPage::SettingsPage(QWidget *parent) :
     QWidget(parent),
@@ -50,6 +56,10 @@ SettingsPage::SettingsPage(QWidget *parent) :
     ui->privacyDefaultIncognito->setChecked(privacy == IncognitoPrivacy);
     ui->useragentString->setText(useragentString());
     ui->defaultUseragentString->setIcon(style()->standardIcon(QStyle::SP_LineEditClearButton));
+    ui->reloadScripts->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
+    ui->openScriptsFolder->setIcon(style()->standardIcon(QStyle::SP_DirOpenIcon));
+
+    updateScriptsLoaded();
 }
 
 SettingsPage::~SettingsPage()
@@ -68,12 +78,92 @@ QString SettingsPage::tempDir()
     return temp_dir;
 }
 
+QString SettingsPage::appDataDir()
+{
+    QString app_dir = QStandardPaths::standardLocations(QStandardPaths::AppDataLocation).front();
+    if (!QDir().exists(app_dir))
+    {
+        QDir().mkpath(app_dir);
+        qDebug() << "app dir" << app_dir;
+    }
+    return app_dir;
+}
+
+QString SettingsPage::userScriptsDir()
+{
+    QString script_dir = appDataDir() + "/userscripts";
+    if (!QDir().exists(script_dir))
+    {
+        QDir().mkpath(script_dir);
+    }
+    return script_dir;
+}
+
+class JSCheckWebPage: public QWebPage
+{
+public:
+    JSCheckWebPage(QObject * _parent = 0): QWebPage(_parent) {}
+protected:
+    virtual void javaScriptConsoleMessage(const QString& _message, int _lineNumber, const QString& _sourceID)
+    {
+        message = _message;
+        line = _lineNumber;
+        source = _sourceID;
+        qDebug() << message << line << source;
+    }
+public:
+    QString message, source;
+    int line;
+};
+
+void SettingsPage::loadScripts()
+{
+    QStringList scripts;
+    JSCheckWebPage page;
+    loaded_scripts_count = 0;
+    foreach (QString filename, QDir(userScriptsDir()).entryList(QStringList() << "*.js", QDir::Files))
+    {
+        page.mainFrame()->setHtml("<html><head></head><body></body></html>");
+        QFile js_file(userScriptsDir() + "/" + filename);
+        if (js_file.open(QFile::ReadOnly))
+        {
+            QTextStream stream(& js_file);
+            QString script = stream.readAll();
+            js_file.close();
+            page.mainFrame()->evaluateJavaScript(script);
+            if (!page.message.contains("error", Qt::CaseInsensitive))
+            {
+                script = "// " + QFileInfo(filename).fileName() + "\r\n" + script;
+                loaded_scripts_count++;
+                qDebug() << filename << " loaded";
+            }
+            else
+            {
+                script = "// " + QFileInfo(filename).fileName() + " has error, " + page.message + " at line " + QString::number(page.line) + "\r\n";
+                qDebug() << script;
+            }
+            scripts << script;
+        }
+    }
+    user_script = scripts.join("\r\n\r\n");
+}
+
+QString SettingsPage::userScript()
+{
+    return user_script;
+}
+
+int SettingsPage::userScriptsLoaded()
+{
+    return loaded_scripts_count;
+}
+
 QSqlDatabase SettingsPage::database()
 {
     static QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE");
     if (!db.isOpen())
     {
-        db.setDatabaseName(tempDir() + "settings.sqlite");
+        db.setDatabaseName(appDataDir() + "settings.sqlite");
         if (db.open())
         {
             databaseInit(db);
@@ -467,4 +557,24 @@ void SettingsPage::on_useragentString_editingFinished()
 void SettingsPage::on_defaultUseragentString_clicked()
 {
     setUseragentString(QString());
+}
+
+void SettingsPage::on_reloadScripts_clicked()
+{
+    loadScripts();
+    updateScriptsLoaded();
+}
+
+void SettingsPage::updateScriptsLoaded()
+{
+    ui->scriptCount->setText(
+                userScriptsLoaded() == 0 ? "No custom scripts" :
+                userScriptsLoaded() == 1 ? "1 custom script" :
+                QString::number(userScriptsLoaded()) + " custom scripts"
+                            );
+}
+
+void SettingsPage::on_openScriptsFolder_clicked()
+{
+    QDesktopServices::openUrl(QUrl::fromLocalFile(QDir::toNativeSeparators(userScriptsDir())));
 }

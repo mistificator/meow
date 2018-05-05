@@ -17,6 +17,11 @@ public:
     ~SettingsPage();
 
     static QString tempDir();
+    static QString appDataDir();
+    static QString userScriptsDir();
+    static QString userScript();
+    static void loadScripts();
+    static int userScriptsLoaded();
 
     enum StartPage {PageEmpty = 0, PageLast = 1, PageHome = 2};
     static bool setStartPage(StartPage page);
@@ -53,6 +58,10 @@ public:
     static Privacy privacyPolicy();
     static bool setUseragentString(QString); // https://deviceatlas.com/blog/list-of-user-agent-strings
     static QString useragentString();
+
+    static bool setValue(QString field, QString value, QString _namespace = QString());
+    static QStringList values(QString field, QString _namespace = QString());
+    static QString value(QString field, QString defaultValue = QString(), QString _namespace = QString());
 signals:
     void proxyChanged(SettingsPage::ProxyType);
     void privacyChanged(SettingsPage::Privacy);
@@ -76,14 +85,16 @@ private slots:
     void on_privacyDefaultIncognito_toggled(bool checked);
     void on_useragentString_editingFinished();
     void on_defaultUseragentString_clicked();
+    void on_reloadScripts_clicked();
+    void on_openScriptsFolder_clicked();
 private:
     Ui::SettingsPage *ui;
     QStringList updateSearchEngines();
+    void updateScriptsLoaded();
+    static QString user_script;
+    static int loaded_scripts_count;
     static QSqlDatabase database();
     static void databaseInit(QSqlDatabase & db);
-    static bool setValue(QString field, QString value, QString _namespace = QString());
-    static QStringList values(QString field, QString _namespace = QString());
-    static QString value(QString field, QString defaultValue = QString(), QString _namespace = QString());
 };
 
 #endif // SETTINGSPAGE_H
