@@ -8,6 +8,7 @@
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
 #include <QtWebKitWidgets/QWebInspector>
+#include <QCompleter>
 
 #include "filemetadata.h"
 #include "settingspage.h"
@@ -27,6 +28,8 @@ public:
     QWebView * view() const;
     QWebPage * page() const;
     bool isIncognito() const;
+public slots:
+    void clearCompleterWords();
 private slots:
     void on_actionLoadPage_triggered();
     void on_actionReloadPage_triggered();
@@ -53,6 +56,7 @@ private slots:
     void downloadRequested(const QNetworkRequest & request);
     void unsupportedContent(QNetworkReply * reply);
     void featurePermissionRequested(QWebFrame* frame, QWebPage::Feature feature);
+    void frameCreated(QWebFrame * frame);
 
     void updownProgress(qint64 processed, qint64 total);
 private:
@@ -66,6 +70,7 @@ private:
     Privacy privacy;
     QString script;
     QWebInspector * inspector;
+    QCompleter * completer;
     void setIncognito();
     void applyIcon();
     void applyTitle();
@@ -74,6 +79,8 @@ private:
     void saveReplyToDisk(QNetworkReply * reply);
     void modifyExif(QString filename, QUrl file_url, QUrl page_url, QStringList tags);
     QRegExp undesiredSymbols(QString str = "\"&,\\:?/") const;
+    void runUserScriptRecursive(QWebFrame *);
+    void updateCompleter(QString);
 protected:
     void showEvent(QShowEvent *);
 signals:

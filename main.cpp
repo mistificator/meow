@@ -33,15 +33,15 @@ int main(int argc, char *argv[])
 
     QApplication a(argc, argv);
 
-    if (SettingsPage::value("FatalExit").toInt() != 0 && SettingsPage::startPage() == SettingsPage::PageLast)
+    if (!SettingsPage::itWasSuccessExit() && SettingsPage::startPage() == SettingsPage::PageLast)
     {
         SettingsPage::setLastPages(QStringList());
     }
-    SettingsPage::setValue("FatalExit", "1");
+    SettingsPage::setItWasSuccessExit(false);
 
     MainWindow w;
     w.show();
     int code = a.exec();
 
-    SettingsPage::setValue("FatalExit", QString::number(code));
+    SettingsPage::setItWasSuccessExit(code == 0);
 }

@@ -11,6 +11,8 @@
 #include <QNetworkProxyFactory>
 #include <QGraphicsOpacityEffect>
 #include <QPropertyAnimation>
+#include <QSslConfiguration>
+#include <QSslSocket>
 
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
@@ -21,6 +23,10 @@ MainWindow::MainWindow(QWidget *parent) :
 
     QWebSettings::globalSettings()->setAttribute(QWebSettings::DeveloperExtrasEnabled, true);
 //    QWebSettings::globalSettings()->setAttribute(QWebSettings::DnsPrefetchEnabled, true);
+
+    QSslConfiguration conf = QSslConfiguration::defaultConfiguration();
+    conf.setPeerVerifyMode(QSslSocket::QueryPeer);
+    QSslConfiguration::setDefaultConfiguration(conf);
 
     ui->setupUi(this);
     ui->mainToolBar->hide();

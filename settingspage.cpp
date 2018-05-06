@@ -55,9 +55,12 @@ SettingsPage::SettingsPage(QWidget *parent) :
     ui->privacyDefaultUsual->setChecked(privacy == UsualPrivacy);
     ui->privacyDefaultIncognito->setChecked(privacy == IncognitoPrivacy);
     ui->useragentString->setText(useragentString());
+    ui->useragentString->home(true);
+    ui->useragentString->deselect();
     ui->defaultUseragentString->setIcon(style()->standardIcon(QStyle::SP_LineEditClearButton));
     ui->reloadScripts->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
     ui->openScriptsFolder->setIcon(style()->standardIcon(QStyle::SP_DirOpenIcon));
+    ui->clearHistory->setIcon(style()->standardIcon(QStyle::SP_LineEditClearButton));
 
     updateScriptsLoaded();
 }
@@ -409,6 +412,40 @@ QString SettingsPage::useragentString()
     return value("Useragent");
 }
 
+bool SettingsPage::setItWasSuccessExit(bool state)
+{
+    return setValue("FatalExit", QString::number(state == 0));
+}
+
+bool SettingsPage::itWasSuccessExit()
+{
+    return value("FatalExit").toInt() == 0;
+}
+
+bool SettingsPage::addCompleterWords(QString words)
+{
+    QStringList completer_words = completerWords();
+    if (!completer_words.contains(words, Qt::CaseInsensitive))
+    {
+        completer_words << words;
+    }
+    while (completer_words.count() > 1000)
+    {
+        completer_words.takeFirst();
+    }
+    return setValue("CompleterWords", completer_words.join("\r\n"));
+}
+
+bool SettingsPage::clearCompleterWords()
+{
+    return setValue("CompleterWords", QString());
+}
+
+QStringList SettingsPage::completerWords()
+{
+    return value("CompleterWords").split("\r\n");
+}
+
 void SettingsPage::on_pageEmpty_toggled(bool checked)
 {
     if (checked)
@@ -568,7 +605,7 @@ void SettingsPage::on_reloadScripts_clicked()
 void SettingsPage::updateScriptsLoaded()
 {
     ui->scriptCount->setText(
-                userScriptsLoaded() == 0 ? "No custom scripts" :
+                userScriptsLoaded() == 0 ? "no custom scripts" :
                 userScriptsLoaded() == 1 ? "1 custom script" :
                 QString::number(userScriptsLoaded()) + " custom scripts"
                             );
@@ -577,4 +614,9 @@ void SettingsPage::updateScriptsLoaded()
 void SettingsPage::on_openScriptsFolder_clicked()
 {
     QDesktopServices::openUrl(QUrl::fromLocalFile(QDir::toNativeSeparators(userScriptsDir())));
+}
+
+void SettingsPage::on_clearHistory_clicked()
+{
+    clearCompleterWords();
 }

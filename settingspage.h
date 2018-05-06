@@ -59,6 +59,13 @@ public:
     static bool setUseragentString(QString); // https://deviceatlas.com/blog/list-of-user-agent-strings
     static QString useragentString();
 
+    static bool setItWasSuccessExit(bool);
+    static bool itWasSuccessExit();
+
+    static bool addCompleterWords(QString);
+    static bool clearCompleterWords();
+    static QStringList completerWords();
+
     static bool setValue(QString field, QString value, QString _namespace = QString());
     static QStringList values(QString field, QString _namespace = QString());
     static QString value(QString field, QString defaultValue = QString(), QString _namespace = QString());
@@ -87,6 +94,8 @@ private slots:
     void on_defaultUseragentString_clicked();
     void on_reloadScripts_clicked();
     void on_openScriptsFolder_clicked();
+    void on_clearHistory_clicked();
+
 private:
     Ui::SettingsPage *ui;
     QStringList updateSearchEngines();

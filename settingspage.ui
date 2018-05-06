@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>400</width>
-    <height>748</height>
+    <height>814</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -256,7 +256,11 @@
       <item>
        <layout class="QHBoxLayout" name="horizontalLayout_3">
         <item>
-         <widget class="QLineEdit" name="useragentString"/>
+         <widget class="QLineEdit" name="useragentString">
+          <property name="clearButtonEnabled">
+           <bool>false</bool>
+          </property>
+         </widget>
         </item>
         <item>
          <widget class="QToolButton" name="defaultUseragentString">
@@ -277,18 +281,18 @@
        </layout>
       </item>
       <item>
-       <widget class="QLabel" name="label_2">
-        <property name="text">
-         <string>User scripts</string>
-        </property>
-       </widget>
-      </item>
-      <item>
        <layout class="QHBoxLayout" name="horizontalLayout_4">
+        <item>
+         <widget class="QLabel" name="label_2">
+          <property name="text">
+           <string>User scripts:</string>
+          </property>
+         </widget>
+        </item>
         <item>
          <widget class="QLabel" name="scriptCount">
           <property name="text">
-           <string>No custom scripts</string>
+           <string>no custom scripts</string>
           </property>
          </widget>
         </item>
@@ -319,6 +323,24 @@
           <property name="toolTip">
            <string>Open user scripts folder</string>
           </property>
+          <property name="text">
+           <string>...</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </item>
+      <item>
+       <layout class="QHBoxLayout" name="horizontalLayout_5">
+        <item>
+         <widget class="QLabel" name="label_3">
+          <property name="text">
+           <string>Clear history</string>
+          </property>
+         </widget>
+        </item>
+        <item>
+         <widget class="QToolButton" name="clearHistory">
           <property name="text">
            <string>...</string>
           </property>

@@ -51,6 +51,7 @@ WebPage::WebPage(Privacy _privacy, QWidget *parent) :
     connect(page(), SIGNAL(downloadRequested(QNetworkRequest)), this, SLOT(downloadRequested(QNetworkRequest)));
     connect(page(), SIGNAL(unsupportedContent(QNetworkReply*)), this, SLOT(unsupportedContent(QNetworkReply*)));
     connect(page(), SIGNAL(loadProgress(int)), ui->progressBar, SLOT(setValue(int)));
+    connect(page(), SIGNAL(frameCreated(QWebFrame*)), this, SLOT(frameCreated(QWebFrame*)));
 
     inspector = new QWebInspector();
     inspector->setPage(page());
@@ -81,6 +82,8 @@ WebPage::WebPage(Privacy _privacy, QWidget *parent) :
     ui->backButton->setDefaultAction(ui->actionBack);
     ui->forwardButton->setDefaultAction(ui->actionForward);
 
+    completer = new QCompleter(this);
+    updateCompleter(QString());
     if (privacy == IncognitoPrivacy)
     {
         setIncognito();
@@ -118,11 +121,13 @@ void WebPage::on_actionLoadPage_triggered()
             if (search_engine.contains("%1"))
             {
                 url = search_engine.arg(QString(url_copy.toEncoded()));
+                updateCompleter(url_copy.toString(QUrl::RemoveScheme | QUrl::RemovePort));
             }
             else
             if (!search_engine.isEmpty())
             {
                 url = search_engine + url_copy.toEncoded();
+                updateCompleter(url_copy.toString(QUrl::RemoveScheme | QUrl::RemovePort));
             }
             else
             {
@@ -177,15 +182,19 @@ void WebPage::on_webView_loadFinished(bool status)
         {
             downloadRequested(QNetworkRequest(view()->url()));
         }
+        else
+        {
+            runUserScriptRecursive(page()->mainFrame());
+        }
     }
     else
     {
         qDebug() << "loading failed!!!";
-        page()->mainFrame()->setHtml("<html><body><div style=\"position: absolute; top: 0;bottom: 0; left: 0; right: 0; margin: auto; width: 200px; height: 100px;\"><h1>Loading failed</h1></div></body></html>", view()->url());
+//        page()->mainFrame()->setHtml("<html><body><div style=\"position: absolute; top: 0;bottom: 0; left: 0; right: 0; margin: auto; width: 200px; height: 100px;\"><h1>Loading failed</h1></div></body></html>", view()->url());
     }
     applyIcon();
     ui->progressBar->setValue(0);
-    ui->dockWidget->setWindowTitle("Web inspector - " + view()->url().toString());
+    ui->dockWidget->setWindowTitle("Web Inspector - " + view()->url().toString());
 }
 
 void WebPage::on_webView_titleChanged(const QString &)
@@ -231,18 +240,18 @@ void WebPage::applyIcon()
 
 void WebPage::applyTitle()
 {
+    QString title = current_page_title = view()->title();
+    if (view()->url().isEmpty() || view()->url().toString().trimmed().compare("about:blank", Qt::CaseInsensitive) == 0)
+    {
+        title = "New Tab";
+        ui->webAddress->setText("");
+    }
     if (QTabWidget * tw = qobject_cast<QTabWidget *>(parent()->parent()))
     {
         if (TabBar * tb = qobject_cast<TabBar *>(TabWidgetOpener::tabBar(tw)))
         {
             const int index = tw->indexOf(this);
-            QString title = current_page_title = view()->title();
             tw->setTabToolTip(index, title);
-            if (view()->url().isEmpty() || view()->url().toString().trimmed().compare("about:blank", Qt::CaseInsensitive) == 0)
-            {
-                title = "New Tab";
-                ui->webAddress->setText("");
-            }
             tw->setTabText(index, title);
         }
     }
@@ -312,10 +321,24 @@ void WebPage::actionOpenLinkInNewWindow()
 
 void WebPage::actionOpenFrameInNewWindow()
 {
-    QUrl url = hitTest(current_pos).frame()->url();
-    if (!url.isEmpty() && url.isValid())
+    QString html = hitTest(current_pos).frame()->documentElement().toOuterXml();
+    if (!html.isEmpty())
     {
-        emit newWindowLink(url);
+        WebPage * frame_page = new WebPage(privacy, topLevelWidget());
+        frame_page->setWindowFlags(Qt::CustomizeWindowHint | Qt::Tool | Qt::WindowCloseButtonHint | Qt::WindowTitleHint);
+        frame_page->setWindowTitle(current_page_title);
+        frame_page->view()->setHtml(html);
+        for (int i = 0; i < frame_page->ui->horizontalLayout->count(); i++)
+        {
+            QLayoutItem * item = frame_page->ui->horizontalLayout->itemAt(i);
+            if (item->widget())
+            {
+                item->widget()->hide();
+            }
+        }
+        ui->progressBar->hide();
+        frame_page->show();
+        frame_page->activateWindow();
     }
 }
 
@@ -495,10 +518,45 @@ void WebPage::replyFinished(QNetworkReply * reply)
     ui->progressBar->setValue(0);
 }
 
+void WebPage::updateCompleter(QString str)
+{
+    if (!isIncognito())
+    {
+        completer->deleteLater();
+        if (!str.isEmpty())
+        {
+            if (str.startsWith("//"))
+            {
+                str = str.mid(2);
+            }
+            SettingsPage::addCompleterWords(str);
+        }
+        completer = new QCompleter(SettingsPage::completerWords(), this);
+        completer->setCaseSensitivity(Qt::CaseInsensitive);
+        completer->setCompletionMode(QCompleter::PopupCompletion);
+        completer->setFilterMode(Qt::MatchContains);
+        ui->webAddress->setCompleter(completer);
+    }
+}
+
 void WebPage::initialLayoutCompleted()
 {
-    ui->dockWidget->setWindowTitle("Web inspector - " + view()->url().toString());
-    page()->mainFrame()->evaluateJavaScript(SettingsPage::userScript());
+    updateCompleter(view()->url().toString(QUrl::RemoveScheme | QUrl::RemovePort));
+    ui->dockWidget->setWindowTitle("Web Inspector - " + view()->url().toString());
+    runUserScriptRecursive(page()->mainFrame());
+}
+
+void WebPage::runUserScriptRecursive(QWebFrame * frame)
+{
+    frame->evaluateJavaScript(SettingsPage::userScript());
+    foreach (QWebFrame * child_frame, frame->childFrames())
+    {
+        runUserScriptRecursive(child_frame);
+    }
+}
+
+void WebPage::frameCreated(QWebFrame * frame)
+{
 }
 
 void WebPage::downloadRequested(const QNetworkRequest & request)
@@ -517,6 +575,7 @@ void WebPage::unsupportedContent(QNetworkReply * reply)
 
 void WebPage::featurePermissionRequested(QWebFrame* frame, QWebPage::Feature feature)
 {
+    qDebug() << frame->baseUrl() << "requested" << feature;
     page()->setFeaturePermission(frame, feature, QWebPage::PermissionDeniedByUser);
 }
 
@@ -552,4 +611,11 @@ void WebPage::updownProgress(qint64 processed, qint64 total)
 void WebPage::actionInspectElement()
 {
     ui->dockWidget->show();
+}
+
+void WebPage::clearCompleterWords()
+{
+    completer->deleteLater();
+    completer = new QCompleter(this);
+    updateCompleter(QString());
 }
