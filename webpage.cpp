@@ -13,6 +13,8 @@
 #include <QFileDialog>
 #include <QImageReader>
 #include <QBuffer>
+#include <QTableView>
+#include <QStyledItemDelegate>
 
 #include "mainwindow.h"
 #include "tabbar.h"
@@ -22,7 +24,7 @@ class UserAgentWebPage : public QWebPage
 public:
     UserAgentWebPage(QObject * _parent = 0): QWebPage(_parent) {}
 protected:
-    virtual QString userAgentForUrl(const QUrl & url ) const
+    virtual QString userAgentForUrl(const QUrl &) const
     {
         QString str = SettingsPage::useragentString();
         if (str.isEmpty())
@@ -33,11 +35,28 @@ protected:
     }
 };
 
+class CompleterDescColumnDelegate: public QStyledItemDelegate
+{
+public:
+    CompleterDescColumnDelegate(QObject * _parent = 0): QStyledItemDelegate(_parent) {}
+protected:
+    void paint(QPainter * painter, const QStyleOptionViewItem & option, const QModelIndex & index) const
+    {
+        QStyleOptionViewItem opt = option;
+        initStyleOption(&opt, index);
+
+        opt.palette.setColor(QPalette::Text, QColor(Qt::gray));
+        opt.font.setItalic(true);
+
+        QStyledItemDelegate::paint(painter, opt, index);
+    }
+};
+
 WebPage::WebPage(Privacy _privacy, QWidget *parent) :
     QWidget(parent),
     ui(new Ui::WebPage),
     privacy(_privacy),
-    script("// sample script\r\document.title = \"This is the new page title.\";")
+    script("// sample script\r\ndocument.title = \"This is the new page title.\";")
 {
     ui->setupUi(this);
 
@@ -83,7 +102,31 @@ WebPage::WebPage(Privacy _privacy, QWidget *parent) :
     ui->forwardButton->setDefaultAction(ui->actionForward);
 
     completer = new QCompleter(this);
-    updateCompleter(QString());
+    completer->setModel(SettingsPage::completerHistoryModel());
+    completer->setCompletionColumn(SettingsPage::completerHistoryModel()->fieldIndex("Phrase"));
+    completer->setCaseSensitivity(Qt::CaseInsensitive);
+    completer->setCompletionMode(QCompleter::PopupCompletion);
+    completer->setFilterMode(Qt::MatchContains);
+
+    QTableView * view = new QTableView();
+    view->setGridStyle(Qt::NoPen);
+    view->setSelectionBehavior(QTableView::SelectRows);
+    view->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+    view->horizontalHeader()->hide();
+    view->verticalHeader()->setSectionResizeMode(QHeaderView::Fixed);
+    view->verticalHeader()->setDefaultSectionSize(22);
+    view->verticalHeader()->hide();
+    completer->setPopup(view);
+    for (int i = 0; i < SettingsPage::completerHistoryModel()->columnCount(); i++)
+    {
+        if (i != SettingsPage::completerHistoryModel()->fieldIndex("Phrase") && i != SettingsPage::completerHistoryModel()->fieldIndex("Description"))
+        {
+            view->hideColumn(i);
+        }
+    }
+    view->setItemDelegateForColumn(SettingsPage::completerHistoryModel()->fieldIndex("Description"), new CompleterDescColumnDelegate());
+    ui->webAddress->setCompleter(completer);
+
     if (privacy == IncognitoPrivacy)
     {
         setIncognito();
@@ -121,13 +164,13 @@ void WebPage::on_actionLoadPage_triggered()
             if (search_engine.contains("%1"))
             {
                 url = search_engine.arg(QString(url_copy.toEncoded()));
-                updateCompleter(url_copy.toString(QUrl::RemoveScheme | QUrl::RemovePort));
+                updateCompleter(url_copy.toString(QUrl::RemoveScheme | QUrl::RemovePort), "");
             }
             else
             if (!search_engine.isEmpty())
             {
                 url = search_engine + url_copy.toEncoded();
-                updateCompleter(url_copy.toString(QUrl::RemoveScheme | QUrl::RemovePort));
+                updateCompleter(url_copy.toString(QUrl::RemoveScheme | QUrl::RemovePort), "");
             }
             else
             {
@@ -476,8 +519,8 @@ void WebPage::saveReplyToDisk(QNetworkReply * reply)
                         QStringList() <<
                             current_page_title.replace(undesiredSymbols(), QString()) <<
                             current_alt_text.replace(undesiredSymbols(), QString()) <<
-                            current_url.toString(QUrl::RemoveScheme | QUrl::RemovePort | QUrl::RemovePath | QUrl::RemoveQuery).replace(undesiredSymbols(), QString()) <<
-                            url.toString(QUrl::RemoveScheme | QUrl::RemovePort | QUrl::RemovePath | QUrl::RemoveQuery).replace(undesiredSymbols(), QString())
+                            current_url.host().replace(undesiredSymbols(), QString()) <<
+                            url.host().replace(undesiredSymbols(), QString())
                         );
         }
 
@@ -518,30 +561,38 @@ void WebPage::replyFinished(QNetworkReply * reply)
     ui->progressBar->setValue(0);
 }
 
-void WebPage::updateCompleter(QString str)
+void WebPage::updateCompleter(QString phrase, QString desc)
 {
     if (!isIncognito())
     {
-        completer->deleteLater();
-        if (!str.isEmpty())
+        if (!phrase.isEmpty())
         {
-            if (str.startsWith("//"))
+            if (phrase.startsWith("//"))
             {
-                str = str.mid(2);
+                phrase = phrase.mid(2);
             }
-            SettingsPage::addCompleterWords(str);
+            if (desc.startsWith("//"))
+            {
+                desc = desc.mid(2);
+            }
+            SettingsPage::addCompleterPhrase(phrase, desc);
         }
-        completer = new QCompleter(SettingsPage::completerWords(), this);
-        completer->setCaseSensitivity(Qt::CaseInsensitive);
-        completer->setCompletionMode(QCompleter::PopupCompletion);
-        completer->setFilterMode(Qt::MatchContains);
-        ui->webAddress->setCompleter(completer);
     }
 }
 
 void WebPage::initialLayoutCompleted()
 {
-    updateCompleter(view()->url().toString(QUrl::RemoveScheme | QUrl::RemovePort));
+    if (view()->url().host() != QUrl(SettingsPage::currentSearchEngineUrl()).host())
+    {
+        if (view()->title().isEmpty())
+        {
+            updateCompleter(view()->url().toString(QUrl::RemoveScheme | QUrl::RemovePort), QString());
+        }
+        else
+        {
+            updateCompleter(view()->title(), view()->url().toString(QUrl::RemoveScheme | QUrl::RemovePort));
+        }
+    }
     ui->dockWidget->setWindowTitle("Web Inspector - " + view()->url().toString());
     runUserScriptRecursive(page()->mainFrame());
 }
@@ -555,7 +606,7 @@ void WebPage::runUserScriptRecursive(QWebFrame * frame)
     }
 }
 
-void WebPage::frameCreated(QWebFrame * frame)
+void WebPage::frameCreated(QWebFrame *)
 {
 }
 
@@ -613,9 +664,3 @@ void WebPage::actionInspectElement()
     ui->dockWidget->show();
 }
 
-void WebPage::clearCompleterWords()
-{
-    completer->deleteLater();
-    completer = new QCompleter(this);
-    updateCompleter(QString());
-}

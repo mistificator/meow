@@ -161,24 +161,24 @@ int SettingsPage::userScriptsLoaded()
     return loaded_scripts_count;
 }
 
-QSqlDatabase SettingsPage::database()
+QSqlDatabase SettingsPage::databaseSettings()
 {
-    static QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE");
+    static QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "settings");
     if (!db.isOpen())
     {
         db.setDatabaseName(appDataDir() + "settings.sqlite");
         if (db.open())
         {
-            databaseInit(db);
+            databaseSettingsInit(db);
         }
     }
     return db;
 }
 
-void SettingsPage::databaseInit(QSqlDatabase & db)
+void SettingsPage::databaseSettingsInit(QSqlDatabase & db)
 {
     QSqlQuery q(db);
-    q.exec("CREATE TABLE GeneralSettings (Namespace TEXT, Field TEXT, Value TEXT)");
+    q.exec("CREATE TABLE GeneralSettings (Namespace TEXT DEFAULT \"\", Field TEXT DEFAULT \"\", Value TEXT DEFAULT \"\")");
     if (q.lastError().type() != QSqlError::NoError)
     {
         return;
@@ -210,14 +210,38 @@ void SettingsPage::databaseInit(QSqlDatabase & db)
     setPrivacyPolicy(UsualPrivacy);
 }
 
+QSqlDatabase SettingsPage::databaseHistory()
+{
+    static QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "history");
+    if (!db.isOpen())
+    {
+        db.setDatabaseName(appDataDir() + "history.sqlite");
+        if (db.open())
+        {
+            databaseHistoryInit(db);
+        }
+    }
+    return db;
+}
+
+void SettingsPage::databaseHistoryInit(QSqlDatabase & db)
+{
+    QSqlQuery q(db);
+    q.exec("CREATE TABLE CompleterHistory (Id INTEGER PRIMARY KEY AUTOINCREMENT, Namespace TEXT DEFAULT \"\", Phrase TEXT DEFAULT \"\", Description TEXT DEFAULT \"\", Frequency INTEGER DEFAULT \"0\")");
+    if (q.lastError().type() != QSqlError::NoError)
+    {
+        return;
+    }
+}
+
 bool SettingsPage::setValue(QString field, QString value, QString _namespace)
 {
-    if (!database().isOpen())
+    if (!databaseSettings().isOpen())
     {
         qDebug() << "database not open";
         return false;
     }
-    QSqlQuery q(database());
+    QSqlQuery q(databaseSettings());
     if (!values(field).isEmpty())
     {
         if (q.exec(QString("UPDATE GeneralSettings SET Value = \"%2\" WHERE Field = \"%1\" AND Namespace = \"%3\"").arg(field, value, _namespace)))
@@ -228,7 +252,7 @@ bool SettingsPage::setValue(QString field, QString value, QString _namespace)
     q.exec(QString("INSERT INTO GeneralSettings (Field, Value, Namespace) VALUES (\"%1\", \"%2\", \"%3\")").arg(field, value, _namespace));
     if (q.lastError().type() != QSqlError::NoError)
     {
-        qDebug() << "sql error" << q.lastError().text();
+        qDebug() << __FUNCTION__ << q.lastError().text() << q.lastQuery();
     }
     return q.lastError().type() == QSqlError::NoError;
 }
@@ -236,15 +260,15 @@ bool SettingsPage::setValue(QString field, QString value, QString _namespace)
 
 QStringList SettingsPage::values(QString field, QString _namespace)
 {
-    if (!database().isOpen())
+    if (!databaseSettings().isOpen())
     {
         qDebug() << "database not open";
         return QStringList();
     }
-    QSqlQuery q(database());
+    QSqlQuery q(databaseSettings());
     if (!q.exec(QString("SELECT Value FROM GeneralSettings WHERE Field = \"%1\" AND Namespace = \"%2\"").arg(field, _namespace)))
     {
-        qDebug() << "sql error" << q.lastError().text();
+        qDebug() << __FUNCTION__ << q.lastError().text() << q.lastQuery();
         return QStringList();
     }
     QStringList list;
@@ -348,7 +372,12 @@ QString SettingsPage::currentSearchEngineUrl()
     {
         return QString();
     }
-    return engines.at(index);
+    QString url(engines.at(index));
+    if (QUrl(url).scheme().isEmpty())
+    {
+        url = "https://" + url;
+    }
+    return url;
 }
 
 
@@ -422,28 +451,51 @@ bool SettingsPage::itWasSuccessExit()
     return value("FatalExit").toInt() == 0;
 }
 
-bool SettingsPage::addCompleterWords(QString words)
+QSqlTableModel * SettingsPage::completerHistoryModel()
 {
-    QStringList completer_words = completerWords();
-    if (!completer_words.contains(words, Qt::CaseInsensitive))
+    static QSqlTableModel * model = 0;
+    if (model == 0)
     {
-        completer_words << words;
+        model = new QSqlTableModel(0, databaseHistory());
+        model->setTable("CompleterHistory");
+        model->setSort(model->fieldIndex("Frequency"), Qt::DescendingOrder);
     }
-    while (completer_words.count() > 1000)
-    {
-        completer_words.takeFirst();
-    }
-    return setValue("CompleterWords", completer_words.join("\r\n"));
+    return model;
 }
 
-bool SettingsPage::clearCompleterWords()
+bool SettingsPage::addCompleterPhrase(QString phrase, QString desc, QString _namespace)
 {
-    return setValue("CompleterWords", QString());
+    QSqlTableModel * model = completerHistoryModel();
+    QSqlQuery q(databaseHistory());
+    if (q.exec(QString("SELECT Id FROM %1 WHERE Phrase = \"%2\"").arg(model->tableName(), phrase)) && q.next())
+    {
+        if (q.exec(QString("UPDATE %1 SET Frequency = Frequency + 1 WHERE Id = \"%2\"")
+                      .arg(model->tableName(), q.value(0).toString())))
+        {
+            return model->select();
+        }
+        qDebug() << __FUNCTION__ << q.lastError().text() << q.lastQuery();
+        return false;
+    }
+    if (!q.exec(QString("INSERT INTO %1 (Namespace, Phrase, Description) VALUES (\"%2\", \"%3\", \"%4\")")
+                .arg(model->tableName(), _namespace, phrase, desc)))
+    {
+        qDebug() << __FUNCTION__ << q.lastError().text() << q.lastQuery();
+        return false;
+    }
+    return model->select();
 }
 
-QStringList SettingsPage::completerWords()
+bool SettingsPage::clearCompleterHistory()
 {
-    return value("CompleterWords").split("\r\n");
+    QSqlTableModel * model = completerHistoryModel();
+    QSqlQuery q(databaseHistory());
+    if (!q.exec(QString("DELETE FROM %1").arg(model->tableName())))
+    {
+        qDebug() << __FUNCTION__ << q.lastError().text() << q.lastQuery();
+        return false;
+    }
+    return model->select();
 }
 
 void SettingsPage::on_pageEmpty_toggled(bool checked)
@@ -508,7 +560,7 @@ QStringList SettingsPage::updateSearchEngines()
     for (int i = 0; i < ui->searchEngine->count(); i++)
     {
         QString url =  ui->searchEngine->itemText(i);
-//        ui->searchEngine->setItemIcon(i, QWebSettings::iconForUrl(QUrl(url).adjusted(QUrl::RemovePath))); // don't work
+//        ui->searchEngine->setItemIcon(i, QWebSettings::iconForUrl(QUrl(url).adjusted(QUrl::RemovePath))); // doesn't work
         list << url;
     }
     return list;
@@ -618,5 +670,5 @@ void SettingsPage::on_openScriptsFolder_clicked()
 
 void SettingsPage::on_clearHistory_clicked()
 {
-    clearCompleterWords();
+    clearCompleterHistory();
 }

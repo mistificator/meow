@@ -3,6 +3,7 @@
 
 #include <QWidget>
 #include <QtSql/QSqlDatabase>
+#include <QtSql/QSqlTableModel>
 
 namespace Ui {
 class SettingsPage;
@@ -62,9 +63,9 @@ public:
     static bool setItWasSuccessExit(bool);
     static bool itWasSuccessExit();
 
-    static bool addCompleterWords(QString);
-    static bool clearCompleterWords();
-    static QStringList completerWords();
+    static QSqlTableModel * completerHistoryModel();
+    static bool addCompleterPhrase(QString phrase, QString desc, QString _namespace = QString());
+    static bool clearCompleterHistory();
 
     static bool setValue(QString field, QString value, QString _namespace = QString());
     static QStringList values(QString field, QString _namespace = QString());
@@ -95,15 +96,16 @@ private slots:
     void on_reloadScripts_clicked();
     void on_openScriptsFolder_clicked();
     void on_clearHistory_clicked();
-
 private:
     Ui::SettingsPage *ui;
     QStringList updateSearchEngines();
     void updateScriptsLoaded();
     static QString user_script;
     static int loaded_scripts_count;
-    static QSqlDatabase database();
-    static void databaseInit(QSqlDatabase & db);
+    static QSqlDatabase databaseSettings();
+    static void databaseSettingsInit(QSqlDatabase & db);
+    static QSqlDatabase databaseHistory();
+    static void databaseHistoryInit(QSqlDatabase & db);
 };
 
 #endif // SETTINGSPAGE_H

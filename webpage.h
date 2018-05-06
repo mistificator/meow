@@ -28,8 +28,6 @@ public:
     QWebView * view() const;
     QWebPage * page() const;
     bool isIncognito() const;
-public slots:
-    void clearCompleterWords();
 private slots:
     void on_actionLoadPage_triggered();
     void on_actionReloadPage_triggered();
@@ -80,7 +78,7 @@ private:
     void modifyExif(QString filename, QUrl file_url, QUrl page_url, QStringList tags);
     QRegExp undesiredSymbols(QString str = "\"&,\\:?/") const;
     void runUserScriptRecursive(QWebFrame *);
-    void updateCompleter(QString);
+    void updateCompleter(QString, QString);
 protected:
     void showEvent(QShowEvent *);
 signals:
