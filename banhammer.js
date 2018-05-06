@@ -13,6 +13,7 @@ var url_filters =
     "an.yandex.ru",
     "direct.yandex.ru",
     "awaps.yandex.net",
+    "awaps.yandex.ru",
     "yastatic.net",
     "banner.rbc.ru",
     "medialand.ru",
@@ -40,13 +41,13 @@ var url_filters =
     "exoclick.com",
 	"mrelko.com",
 	"trafficfactory.biz"
-	
+
 ];
 
 var keyword_filters =
 [
 	"advert",
-	"bn_",		
+	"bn_",
 	"!ad_",
 	"_adtune",
 	"yap-",
@@ -55,7 +56,9 @@ var keyword_filters =
 	"-ad-",
 	"adfox_",
 	"_ads_",
-	"adsbygoogle"
+	"adsbygoogle",
+	"advert",
+	"ban_"
 ];
 
 var ads_count = 0;
@@ -64,12 +67,12 @@ var total_blocking_time = 0;
 
 function checkUrlInSrc(ad, url_filter)
 {
-	return ad.src.indexOf(url_filters[j]) > -1;
+	return ad.src.toLowerCase().indexOf(url_filters[j]) > -1;
 }
 
 function checkUrlInSrcName(ad, url_filter)
 {
-	return checkUrlInSrc(ad, url_filter) || ad.name.indexOf(url_filter) > -1;
+	return checkUrlInSrc(ad, url_filter) || ad.name.toLowerCase().indexOf(url_filter) > -1;
 }
 
 function checkKeywordInIdClass(ad, keyword_filter)
@@ -77,32 +80,33 @@ function checkKeywordInIdClass(ad, keyword_filter)
 	var starts_with = false;
 	if (keyword_filter.charAt(0) == '!')
 	{
-		keyword_filter = keyword_filter.substr(1); 
+		keyword_filter = keyword_filter.substr(1);
 		starts_with = true;
 	}
-	return ((starts_with && (ad.id.indexOf(keyword_filter) == 0 || ad.className.indexOf(keyword_filter) == 0))
-		|| 
-		(!starts_with && (ad.id.indexOf(keyword_filter) > -1 || ad.className.indexOf(keyword_filter) > -1)));	
+	return ((starts_with && (ad.id.toLowerCase().indexOf(keyword_filter) == 0 || ad.className.toLowerCase().indexOf(keyword_filter) == 0)) ||
+		(!starts_with && (ad.id.toLowerCase().indexOf(keyword_filter) > -1 || ad.className.toLowerCase().indexOf(keyword_filter) > -1)));
 }
 
 function blockAd_a(ad)
 {
     for (j = 0; j < url_filters.length; j++)
     {
-        if (ad.href.indexOf(url_filters[j]) > -1)
+        if (ad.href.toLowerCase().indexOf(url_filters[j]) > -1)
         {
+            console.log("blockAd_a " + ad.href);
             ad.remove();
             ads_count++;
             return;
         }
     }
-    if (ad.textContent.indexOf("Янд") != -1 && ad.textContent.indexOf(".Ди") != -1) // you are fucking crazy bastards
+    if (ad.textContent.indexOf("Янд") > -1 && ad.textContent.indexOf(".Ди") > -1) // you are fucking crazy bastards
     {
         ad = ad.parentNode.parentNode.parentNode;
         if (ad.tagName.toLowerCase() != "span" || ad.tagName.toLowerCase() != "div")
         {
             ad = ad.parentNode;
         }
+        console.log("blockAd_a Яндекс.Директ");
         ad.remove();
         ads_count++;
     }
@@ -114,6 +118,7 @@ function blockAd_frame(ad)
     {
         if (checkUrlInSrcName(ad, url_filters[j]))
         {
+            console.log("blockAd_frame " + ad.src + " " + ad.name);
             ad.remove();
             ads_count++;
             return;
@@ -127,8 +132,13 @@ function blockAd_div(ad)
     {
 		if (checkKeywordInIdClass(ad, keyword_filters[j]))
         {
-            ad.remove();
-            ads_count++;
+            // ad.remove(); // this is the cause of hanging of some sites
+            if (ad.style.display != "none")
+            {
+                console.log("blockAd_div " + ad.id + " " + ad.className);
+                ad.style.display = "none";
+                ads_count++;
+            }
             return;
         }
     }
@@ -140,6 +150,7 @@ function blockAd_script(ad)
     {
 		if (checkKeywordInIdClass(ad, keyword_filters[j]))
         {
+            console.log("blockAd_script " + ad.id + " " + ad.className);
             ad.remove();
             ads_count++;
             return;
@@ -149,11 +160,12 @@ function blockAd_script(ad)
     {
         if (checkUrlInSrc(ad, url_filters[j]))
         {
+            console.log("blockAd_script " + ad.src);
             ad.remove();
             ads_count++;
             return;
         }
-    }	
+    }
 }
 
 var timer_id = setInterval(function()
