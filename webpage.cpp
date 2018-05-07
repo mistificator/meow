@@ -15,6 +15,7 @@
 #include <QBuffer>
 #include <QTableView>
 #include <QStyledItemDelegate>
+#include <QNetworkConfiguration>
 
 #include "mainwindow.h"
 #include "tabbar.h"
@@ -35,20 +36,39 @@ protected:
     }
 };
 
-class CompleterDescColumnDelegate: public QStyledItemDelegate
+class CompleterColumnDelegate: public QStyledItemDelegate
 {
 public:
-    CompleterDescColumnDelegate(QObject * _parent = 0): QStyledItemDelegate(_parent) {}
+    CompleterColumnDelegate(QObject * _parent = 0): QStyledItemDelegate(_parent) {}
 protected:
     void paint(QPainter * painter, const QStyleOptionViewItem & option, const QModelIndex & index) const
     {
         QStyleOptionViewItem opt = option;
         initStyleOption(&opt, index);
 
-        opt.palette.setColor(QPalette::Text, QColor(Qt::gray));
-        opt.font.setItalic(true);
+        if (index.column() == SettingsPage::completerHistoryModel()->fieldIndex("Description"))
+        {
+            opt.palette.setColor(QPalette::Text, QColor(Qt::gray));
+            opt.font.setItalic(true);
+        }
 
         QStyledItemDelegate::paint(painter, opt, index);
+    }
+};
+
+class UrlCompleter: public QCompleter
+{
+public:
+    UrlCompleter(QObject * _parent): QCompleter(_parent) {}
+    QString pathFromIndex(const QModelIndex & index) const
+    {
+        QSqlTableModel * model = SettingsPage::completerHistoryModel();
+        QString desc = model->data(model->index(index.row(), model->fieldIndex("Description"))).toString();
+        if (!desc.isEmpty())
+        {
+            return desc;
+        }
+        return index.data().toString();
     }
 };
 
@@ -79,7 +99,7 @@ WebPage::WebPage(Privacy _privacy, QWidget *parent) :
 
     connect(this, SIGNAL(showNotifier(QString, int)), dynamic_cast<MainWindow *>(topLevelWidget()), SLOT(showNotifier(QString, int)));
 
-    manager = new QNetworkAccessManager(this);
+    manager = new QNetworkAccessManager(this);    
     connect(manager, SIGNAL(finished(QNetworkReply *)), this, SLOT(replyFinished(QNetworkReply *)));
 
     connect(view(), SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(customContextMenuRequested(QPoint)));
@@ -101,30 +121,32 @@ WebPage::WebPage(Privacy _privacy, QWidget *parent) :
     ui->backButton->setDefaultAction(ui->actionBack);
     ui->forwardButton->setDefaultAction(ui->actionForward);
 
-    completer = new QCompleter(this);
+    completer = new UrlCompleter(this);
     completer->setModel(SettingsPage::completerHistoryModel());
     completer->setCompletionColumn(SettingsPage::completerHistoryModel()->fieldIndex("Phrase"));
     completer->setCaseSensitivity(Qt::CaseInsensitive);
     completer->setCompletionMode(QCompleter::PopupCompletion);
     completer->setFilterMode(Qt::MatchContains);
 
-    QTableView * view = new QTableView();
-    view->setGridStyle(Qt::NoPen);
-    view->setSelectionBehavior(QTableView::SelectRows);
-    view->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
-    view->horizontalHeader()->hide();
-    view->verticalHeader()->setSectionResizeMode(QHeaderView::Fixed);
-    view->verticalHeader()->setDefaultSectionSize(22);
-    view->verticalHeader()->hide();
-    completer->setPopup(view);
+    QTableView * tv = new QTableView();
+    tv->setGridStyle(Qt::NoPen);
+    tv->setSelectionBehavior(QTableView::SelectRows);
+    tv->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
+    tv->horizontalHeader()->hide();
+    tv->verticalHeader()->setSectionResizeMode(QHeaderView::Interactive);
+    tv->verticalHeader()->setDefaultSectionSize(20);
+    tv->verticalHeader()->hide();
+    tv->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    tv->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    completer->setPopup(tv);
     for (int i = 0; i < SettingsPage::completerHistoryModel()->columnCount(); i++)
     {
         if (i != SettingsPage::completerHistoryModel()->fieldIndex("Phrase") && i != SettingsPage::completerHistoryModel()->fieldIndex("Description"))
         {
-            view->hideColumn(i);
+            tv->hideColumn(i);
         }
     }
-    view->setItemDelegateForColumn(SettingsPage::completerHistoryModel()->fieldIndex("Description"), new CompleterDescColumnDelegate());
+    tv->setItemDelegateForColumn(SettingsPage::completerHistoryModel()->fieldIndex("Description"), new CompleterColumnDelegate());
     ui->webAddress->setCompleter(completer);
 
     if (privacy == IncognitoPrivacy)
@@ -470,6 +492,8 @@ void WebPage::saveReplyToDisk(QNetworkReply * reply)
         redirect_page->view()->load(url);
         return;
     }
+    qDebug() << "saveReplyToDisk" << url;
+
     QString url_adjusted = url.toString(QUrl::RemoveScheme | QUrl::RemovePort);
     QString filename = QFileInfo(url_adjusted).fileName();
     if (filename.contains(undesiredSymbols()))
@@ -550,6 +574,7 @@ void WebPage::saveReplyToDisk(QNetworkReply * reply)
 
 void WebPage::replyFinished(QNetworkReply * reply)
 {
+    qDebug() << "replyFinished";
     saveReplyToDisk(reply);
     delete reply;
 
@@ -614,7 +639,8 @@ void WebPage::downloadRequested(const QNetworkRequest & request)
 {
     qDebug() << "request" << request.url();
     QNetworkReply * reply = manager->get(request);
-    connect(reply, SIGNAL(downloadProgress(qint64,qint64)), this, SLOT(updownProgress(qint64,qint64)));
+    connect(reply, SIGNAL(downloadProgress(qint64, qint64)), this, SLOT(updownProgress(qint64, qint64)));
+    qDebug() << "downloading started";
 }
 
 void WebPage::unsupportedContent(QNetworkReply * reply)
@@ -652,7 +678,7 @@ QRegExp WebPage::undesiredSymbols(QString str) const
 
 void WebPage::updownProgress(qint64 processed, qint64 total)
 {
-    qDebug() << "updown" << processed << "/" + total;
+    qDebug() << "updown" << processed << "/" << total;
     if (total > 0)
     {
         ui->progressBar->setValue(ui->progressBar->maximum() * processed / total);

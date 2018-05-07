@@ -15,6 +15,7 @@ var url_filters =
     "awaps.yandex.net",
     "awaps.yandex.ru",
     "yastatic.net",
+	".yandex.ru/count",
     "banner.rbc.ru",
     "medialand.ru",
 	"adx.com.ru",
@@ -58,7 +59,8 @@ var keyword_filters =
 	"_ads_",
 	"adsbygoogle",
 	"advert",
-	"ban_"
+	"ban_",
+	"-adv-"
 ];
 
 var ads_count = 0;
@@ -93,7 +95,7 @@ function blockAd_a(ad)
     {
         if (ad.href.toLowerCase().indexOf(url_filters[j]) > -1)
         {
-            console.log("blockAd_a " + ad.href);
+            console.log("BanHammer: a " + ad.href);
             ad.remove();
             ads_count++;
             return;
@@ -106,7 +108,7 @@ function blockAd_a(ad)
         {
             ad = ad.parentNode;
         }
-        console.log("blockAd_a Яндекс.Директ");
+        console.log("BanHammer: Яндекс.Директ");
         ad.remove();
         ads_count++;
     }
@@ -118,7 +120,7 @@ function blockAd_frame(ad)
     {
         if (checkUrlInSrcName(ad, url_filters[j]))
         {
-            console.log("blockAd_frame " + ad.src + " " + ad.name);
+            console.log("BanHammer: frame " + ad.src + " " + ad.name);
             ad.remove();
             ads_count++;
             return;
@@ -135,8 +137,9 @@ function blockAd_div(ad)
             // ad.remove(); // this is the cause of hanging of some sites
             if (ad.style.display != "none")
             {
-                console.log("blockAd_div " + ad.id + " " + ad.className);
+                console.log("BanHammer: div " + ad.id + " " + ad.className);
                 ad.style.display = "none";
+				ad.innerHtml = "";
                 ads_count++;
             }
             return;
@@ -150,7 +153,7 @@ function blockAd_script(ad)
     {
 		if (checkKeywordInIdClass(ad, keyword_filters[j]))
         {
-            console.log("blockAd_script " + ad.id + " " + ad.className);
+            console.log("BanHammer: script " + ad.id + " " + ad.className);
             ad.remove();
             ads_count++;
             return;
@@ -160,7 +163,7 @@ function blockAd_script(ad)
     {
         if (checkUrlInSrc(ad, url_filters[j]))
         {
-            console.log("blockAd_script " + ad.src);
+            console.log("BanHammer: script " + ad.src);
             ad.remove();
             ads_count++;
             return;
@@ -200,10 +203,6 @@ var timer_id = setInterval(function()
     if (ads_count > 0)
     {
 		var endTime = new Date();
-		if (total_ads_count == 0)
-		{
-			console.log("BanHammer: start ads blocking");
-		}
 		total_ads_count += ads_count;
 		total_blocking_time += endTime - startTime;
         console.log("BanHammer: total " + total_ads_count + " ads removed, time " + total_blocking_time + " ms");
