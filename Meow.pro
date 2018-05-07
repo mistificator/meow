@@ -32,18 +32,21 @@ SOURCES += main.cpp\
         webpage.cpp \
         filemetadata.cpp \
         settingspage.cpp \
-        tabbar.cpp
+        tabbar.cpp \
+    downloadspage.cpp
 
 HEADERS  += mainwindow.h \
             webpage.h \
             filemetadata.h \
             settingspage.h \
             tabbar.h \
-            version.h
+            version.h \
+    downloadspage.h
 
 FORMS    += mainwindow.ui \
             webpage.ui \
-            settingspage.ui
+            settingspage.ui \
+    downloadspage.ui
 
 win32:
 {

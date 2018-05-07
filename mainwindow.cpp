@@ -17,7 +17,7 @@
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
-    last_page(0), settings_page(0)
+    last_page(0), settings_page(0), downloads_page(0)
 {
     proxyChanged(SettingsPage::proxyType());
 
@@ -40,11 +40,13 @@ MainWindow::MainWindow(QWidget *parent) :
     ui->actionAddTab->setIcon(style()->standardIcon(QStyle::SP_DirHomeIcon));
     ui->actionAddIncognitoTab->setIcon(style()->standardIcon(QStyle::SP_VistaShield));
     ui->actionShowSettings->setIcon(style()->standardIcon(QStyle::SP_DriveNetIcon));
+    ui->actionShowDownloads->setIcon(style()->standardIcon(QStyle::SP_DriveHDIcon));
 
     newtab_menu.addAction(ui->actionAddTab);
     newtab_menu.addAction(ui->actionAddIncognitoTab);
     newtab_menu.addSeparator();
     newtab_menu.addAction(ui->actionShowSettings);
+    newtab_menu.addAction(ui->actionShowDownloads);
 
     // taken from https://stackoverflow.com/questions/19975137/how-can-i-add-a-new-tab-button-next-to-the-tabs-of-a-qmdiarea-in-tabbed-view-m/27127109#27127109
     add_tab = new QToolButton();
@@ -123,6 +125,10 @@ void MainWindow::on_tabWidget_tabCloseRequested(int index)
     {
         settings_page = 0;
     }
+    if (w == downloads_page)
+    {
+        downloads_page = 0;
+    }
     w->deleteLater();
 
     ui->tabWidget->setCurrentIndex(qMax(index - 1, 0));
@@ -146,7 +152,7 @@ void MainWindow::newWindowLink(QUrl url)
     last_page->view()->load(url);
 }
 
-void MainWindow::linkHovered(const QString & link, const QString & title, const QString & textContent)
+void MainWindow::linkHovered(const QString & link, const QString &, const QString &)
 {
     ui->statusBar->showMessage(link, 10000);
 }
@@ -205,6 +211,21 @@ void MainWindow::on_actionShowSettings_triggered()
     settings_page->setWidget(page = new SettingsPage());
     connect(page, SIGNAL(proxyChanged(SettingsPage::ProxyType)), this, SLOT(proxyChanged(SettingsPage::ProxyType)));
     connect(page, SIGNAL(privacyChanged(SettingsPage::Privacy)), this, SLOT(privacyChanged(SettingsPage::Privacy)));
+}
+
+void MainWindow::on_actionShowDownloads_triggered()
+{
+    if (downloads_page)
+    {
+        ui->tabWidget->setCurrentWidget(downloads_page);
+        return;
+    }
+    int index = ui->tabWidget->count() - 1;
+    ui->tabWidget->insertTab(index, downloads_page = new DownloadsPage(this), "Downloads");
+    ui->tabWidget->setCurrentIndex(index);
+    ui->tabWidget->setTabIcon(index, style()->standardIcon(QStyle::SP_DriveHDIcon));
+
+    SettingsPage::downloadsHistoryModel()->select();
 }
 
 void MainWindow::proxyChanged(SettingsPage::ProxyType proxy_type)
@@ -277,5 +298,4 @@ void MainWindow::privacyChanged(SettingsPage::Privacy _privacy)
 {
     add_tab->setDefaultAction(_privacy == SettingsPage::UsualPrivacy ? ui->actionAddTab : ui->actionAddIncognitoTab);
 }
-
 

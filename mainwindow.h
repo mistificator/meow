@@ -9,6 +9,7 @@
 #include <QScrollArea>
 #include "webpage.h"
 #include "settingspage.h"
+#include "downloadspage.h"
 
 namespace Ui
 {
@@ -34,6 +35,8 @@ private slots:
     void on_actionShowSettings_triggered();
     void proxyChanged(SettingsPage::ProxyType);
     void privacyChanged(SettingsPage::Privacy);
+    void on_actionShowDownloads_triggered();
+
 private:
     Ui::MainWindow *ui;
     QString temp_dir;
@@ -42,6 +45,7 @@ private:
     QLabel * notifier;
     QTimer * notifier_timer;
     QScrollArea * settings_page;
+    DownloadsPage * downloads_page;
     QToolButton * add_tab;
     void openLastPages();
     void saveLastPages();

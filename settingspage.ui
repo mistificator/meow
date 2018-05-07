@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>400</width>
-    <height>814</height>
+    <height>656</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -362,12 +362,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>66</x>
-     <y>96</y>
+     <x>85</x>
+     <y>94</y>
     </hint>
     <hint type="destinationlabel">
-     <x>105</x>
-     <y>126</y>
+     <x>124</x>
+     <y>120</y>
     </hint>
    </hints>
   </connection>
@@ -378,12 +378,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>205</x>
-     <y>253</y>
+     <x>224</x>
+     <y>222</y>
     </hint>
     <hint type="destinationlabel">
-     <x>219</x>
-     <y>283</y>
+     <x>238</x>
+     <y>248</y>
     </hint>
    </hints>
   </connection>
@@ -394,12 +394,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>168</x>
-     <y>458</y>
+     <x>187</x>
+     <y>392</y>
     </hint>
     <hint type="destinationlabel">
-     <x>187</x>
-     <y>489</y>
+     <x>207</x>
+     <y>421</y>
     </hint>
    </hints>
   </connection>
@@ -410,12 +410,12 @@
    <slot>setEnabled(bool)</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>247</x>
-     <y>458</y>
+     <x>266</x>
+     <y>392</y>
     </hint>
     <hint type="destinationlabel">
-     <x>375</x>
-     <y>490</y>
+     <x>379</x>
+     <y>423</y>
     </hint>
    </hints>
   </connection>
@@ -426,12 +426,12 @@
    <slot>clear()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>362</x>
-     <y>653</y>
+     <x>379</x>
+     <y>576</y>
     </hint>
     <hint type="destinationlabel">
-     <x>319</x>
-     <y>654</y>
+     <x>339</x>
+     <y>574</y>
     </hint>
    </hints>
   </connection>

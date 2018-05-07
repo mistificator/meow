@@ -166,7 +166,7 @@ QSqlDatabase SettingsPage::databaseSettings()
     static QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "settings");
     if (!db.isOpen())
     {
-        db.setDatabaseName(appDataDir() + "settings.sqlite");
+        db.setDatabaseName(appDataDir() + "/settings.sqlite");
         if (db.open())
         {
             databaseSettingsInit(db);
@@ -215,7 +215,7 @@ QSqlDatabase SettingsPage::databaseHistory()
     static QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE", "history");
     if (!db.isOpen())
     {
-        db.setDatabaseName(appDataDir() + "history.sqlite");
+        db.setDatabaseName(appDataDir() + "/history.sqlite");
         if (db.open())
         {
             databaseHistoryInit(db);
@@ -228,6 +228,7 @@ void SettingsPage::databaseHistoryInit(QSqlDatabase & db)
 {
     QSqlQuery q(db);
     q.exec("CREATE TABLE CompleterHistory (Id INTEGER PRIMARY KEY AUTOINCREMENT, Namespace TEXT DEFAULT \"\", Phrase TEXT DEFAULT \"\", Description TEXT DEFAULT \"\", Frequency INTEGER DEFAULT \"0\")");
+    q.exec("CREATE TABLE DownloadsHistory (Id INTEGER PRIMARY KEY AUTOINCREMENT, DateTime TIMESTAMP DEFAULT CURRENT_TIMESTAMP, Namespace TEXT DEFAULT \"\", File TEXT DEFAULT \"\", Url TEXT DEFAULT \"\", Page TEXT DEFAULT \"\", Size INTEGER DEFAULT \"0\")");
     if (q.lastError().type() != QSqlError::NoError)
     {
         return;
@@ -498,6 +499,44 @@ bool SettingsPage::clearCompleterHistory()
     return model->select();
 }
 
+QSqlTableModel * SettingsPage::downloadsHistoryModel()
+{
+    static QSqlTableModel * model = 0;
+    if (model == 0)
+    {
+        model = new QSqlTableModel(0, databaseHistory());
+        model->setTable("DownloadsHistory");
+        model->setSort(model->fieldIndex("DateTime"), Qt::DescendingOrder);
+    }
+    return model;
+}
+
+bool SettingsPage::addDownloadEntry(QString file, QString url, QString page, qint64 size, QDateTime datetime, QString _namespace)
+{
+    QSqlTableModel * model = downloadsHistoryModel();
+    QSqlQuery q(databaseHistory());
+    if (!q.exec(QString("INSERT INTO %1 (DateTime, Namespace, File, Url, Page, Size) VALUES (\"%2\", \"%3\", \"%4\", \"%5\", \"%6\", \"%7\")")
+                .arg(model->tableName(), datetime.toString("yyyy-MM-ddThh:mm:ss.zzz"), _namespace, file, url, page, QString::number(size))))
+    {
+        qDebug() << __FUNCTION__ << q.lastError().text() << q.lastQuery();
+        return false;
+    }
+    return model->select();
+
+}
+
+bool SettingsPage::clearDownloadsHistory()
+{
+    QSqlTableModel * model = downloadsHistoryModel();
+    QSqlQuery q(databaseHistory());
+    if (!q.exec(QString("DELETE FROM %1").arg(model->tableName())))
+    {
+        qDebug() << __FUNCTION__ << q.lastError().text() << q.lastQuery();
+        return false;
+    }
+    return model->select();
+}
+
 void SettingsPage::on_pageEmpty_toggled(bool checked)
 {
     if (checked)
@@ -572,7 +611,7 @@ void SettingsPage::on_searchEngine_currentIndexChanged(int index)
     setCurrentSearchEngine(index);
 }
 
-void SettingsPage::on_searchEngine_editTextChanged(const QString &arg1)
+void SettingsPage::on_searchEngine_editTextChanged(const QString &)
 {
 }
 

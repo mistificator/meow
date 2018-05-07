@@ -127,13 +127,14 @@ WebPage::WebPage(Privacy _privacy, QWidget *parent) :
     completer->setCaseSensitivity(Qt::CaseInsensitive);
     completer->setCompletionMode(QCompleter::PopupCompletion);
     completer->setFilterMode(Qt::MatchContains);
+    completer->setMaxVisibleItems(10);
 
     QTableView * tv = new QTableView();
     tv->setGridStyle(Qt::NoPen);
     tv->setSelectionBehavior(QTableView::SelectRows);
     tv->horizontalHeader()->setSectionResizeMode(QHeaderView::ResizeToContents);
     tv->horizontalHeader()->hide();
-    tv->verticalHeader()->setSectionResizeMode(QHeaderView::Interactive);
+//    tv->verticalHeader()->setSectionResizeMode(QHeaderView::Interactive);
     tv->verticalHeader()->setDefaultSectionSize(20);
     tv->verticalHeader()->hide();
     tv->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
@@ -533,6 +534,8 @@ void WebPage::saveReplyToDisk(QNetworkReply * reply)
     {
         file.write(data);
         file.close();
+
+        SettingsPage::addDownloadEntry(file.fileName(), url.toString(), current_url.toString(), file.size());
 
         if (SettingsPage::writeMetadataEnabed())
         {

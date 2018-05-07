@@ -4,9 +4,11 @@
 #include <QWidget>
 #include <QtSql/QSqlDatabase>
 #include <QtSql/QSqlTableModel>
+#include <QDateTime>
 
-namespace Ui {
-class SettingsPage;
+namespace Ui
+{
+    class SettingsPage;
 }
 
 class SettingsPage : public QWidget
@@ -63,13 +65,22 @@ public:
     static bool setItWasSuccessExit(bool);
     static bool itWasSuccessExit();
 
+    static bool setValue(QString field, QString value, QString _namespace = QString());
+    static QStringList values(QString field, QString _namespace = QString());
+    static QString value(QString field, QString defaultValue = QString(), QString _namespace = QString());
+
+    static QSqlDatabase databaseSettings();
+
     static QSqlTableModel * completerHistoryModel();
     static bool addCompleterPhrase(QString phrase, QString desc, QString _namespace = QString());
     static bool clearCompleterHistory();
 
-    static bool setValue(QString field, QString value, QString _namespace = QString());
-    static QStringList values(QString field, QString _namespace = QString());
-    static QString value(QString field, QString defaultValue = QString(), QString _namespace = QString());
+    static QSqlTableModel * downloadsHistoryModel();
+    static bool addDownloadEntry(QString file, QString url, QString page, qint64 size, QDateTime datetime = QDateTime::currentDateTime(), QString _namespace = QString());
+    static bool clearDownloadsHistory();
+
+    static QSqlDatabase databaseHistory();
+
 signals:
     void proxyChanged(SettingsPage::ProxyType);
     void privacyChanged(SettingsPage::Privacy);
@@ -102,9 +113,7 @@ private:
     void updateScriptsLoaded();
     static QString user_script;
     static int loaded_scripts_count;
-    static QSqlDatabase databaseSettings();
     static void databaseSettingsInit(QSqlDatabase & db);
-    static QSqlDatabase databaseHistory();
     static void databaseHistoryInit(QSqlDatabase & db);
 };
 
