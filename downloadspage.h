@@ -2,6 +2,7 @@
 #define DOWNLOADSPAGE_H
 
 #include <QWidget>
+#include <QUrl>
 
 namespace Ui
 {
@@ -16,10 +17,16 @@ public:
     explicit DownloadsPage(QWidget *parent = 0);
     ~DownloadsPage();
 
+signals:
+    void newWindowLink(QUrl);
 private slots:
     void on_openFolder_clicked();
+    void on_openPage_clicked();
     void on_clearHistory_clicked();
     void on_searchBox_textChanged(const QString &arg1);
+
+    void on_openFile_clicked();
+
 private:
     Ui::DownloadsPage *ui;
 };

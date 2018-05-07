@@ -18,6 +18,20 @@
 int SettingsPage::loaded_scripts_count = 0;
 QString SettingsPage::user_script;
 
+class HintSqlTableModel: public QSqlTableModel
+{
+public:
+    HintSqlTableModel(QObject * _parent = 0, QSqlDatabase db = QSqlDatabase()): QSqlTableModel(_parent, db) {}
+    QVariant data(const QModelIndex &idx, int role = Qt::DisplayRole) const
+    {
+        if (role == Qt::ToolTipRole)
+        {
+            return QSqlTableModel::data(idx, Qt::DisplayRole);
+        }
+        return QSqlTableModel::data(idx, role);
+    }
+};
+
 SettingsPage::SettingsPage(QWidget *parent) :
     QWidget(parent),
     ui(new Ui::SettingsPage)
@@ -228,7 +242,7 @@ void SettingsPage::databaseHistoryInit(QSqlDatabase & db)
 {
     QSqlQuery q(db);
     q.exec("CREATE TABLE CompleterHistory (Id INTEGER PRIMARY KEY AUTOINCREMENT, Namespace TEXT DEFAULT \"\", Phrase TEXT DEFAULT \"\", Description TEXT DEFAULT \"\", Frequency INTEGER DEFAULT \"0\")");
-    q.exec("CREATE TABLE DownloadsHistory (Id INTEGER PRIMARY KEY AUTOINCREMENT, DateTime TIMESTAMP DEFAULT CURRENT_TIMESTAMP, Namespace TEXT DEFAULT \"\", File TEXT DEFAULT \"\", Url TEXT DEFAULT \"\", Page TEXT DEFAULT \"\", Size INTEGER DEFAULT \"0\")");
+    q.exec("CREATE TABLE DownloadsHistory (Id INTEGER PRIMARY KEY AUTOINCREMENT, DateTime TIMESTAMP DEFAULT CURRENT_TIMESTAMP, Namespace TEXT DEFAULT \"\", Description TEXT DEFAULT \"\", Title TEXT DEFAULT \"\", File TEXT DEFAULT \"\", Size INTEGER DEFAULT \"0\", Page TEXT DEFAULT \"\", Url TEXT DEFAULT \"\")");
     if (q.lastError().type() != QSqlError::NoError)
     {
         return;
@@ -457,7 +471,7 @@ QSqlTableModel * SettingsPage::completerHistoryModel()
     static QSqlTableModel * model = 0;
     if (model == 0)
     {
-        model = new QSqlTableModel(0, databaseHistory());
+        model = new HintSqlTableModel(0, databaseHistory());
         model->setTable("CompleterHistory");
         model->setSort(model->fieldIndex("Frequency"), Qt::DescendingOrder);
     }
@@ -504,19 +518,19 @@ QSqlTableModel * SettingsPage::downloadsHistoryModel()
     static QSqlTableModel * model = 0;
     if (model == 0)
     {
-        model = new QSqlTableModel(0, databaseHistory());
+        model = new HintSqlTableModel(0, databaseHistory());
         model->setTable("DownloadsHistory");
         model->setSort(model->fieldIndex("DateTime"), Qt::DescendingOrder);
     }
     return model;
 }
 
-bool SettingsPage::addDownloadEntry(QString file, QString url, QString page, qint64 size, QDateTime datetime, QString _namespace)
+bool SettingsPage::addDownloadEntry(QString file, QString url, QString page, qint64 size, QString title, QString description, QDateTime datetime, QString _namespace)
 {
     QSqlTableModel * model = downloadsHistoryModel();
     QSqlQuery q(databaseHistory());
-    if (!q.exec(QString("INSERT INTO %1 (DateTime, Namespace, File, Url, Page, Size) VALUES (\"%2\", \"%3\", \"%4\", \"%5\", \"%6\", \"%7\")")
-                .arg(model->tableName(), datetime.toString("yyyy-MM-ddThh:mm:ss.zzz"), _namespace, file, url, page, QString::number(size))))
+    if (!q.exec(QString("INSERT INTO %1 (DateTime, Namespace, File, Url, Page, Size, Title, Description) VALUES (\"%2\", \"%3\", \"%4\", \"%5\", \"%6\", \"%7\", \"%8\", \"%9\")")
+                .arg(model->tableName(), datetime.toString("yyyy-MM-ddThh:mm:ss.zzz"), _namespace, file, url, page, QString::number(size), title, description)))
     {
         qDebug() << __FUNCTION__ << q.lastError().text() << q.lastQuery();
         return false;

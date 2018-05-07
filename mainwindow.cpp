@@ -39,8 +39,8 @@ MainWindow::MainWindow(QWidget *parent) :
     setWindowIcon(QIcon(":/Images/16x16.png"));
     ui->actionAddTab->setIcon(style()->standardIcon(QStyle::SP_DirHomeIcon));
     ui->actionAddIncognitoTab->setIcon(style()->standardIcon(QStyle::SP_VistaShield));
-    ui->actionShowSettings->setIcon(style()->standardIcon(QStyle::SP_DriveNetIcon));
-    ui->actionShowDownloads->setIcon(style()->standardIcon(QStyle::SP_DriveHDIcon));
+    ui->actionShowSettings->setIcon(style()->standardIcon(QStyle::SP_FileDialogListView));
+    ui->actionShowDownloads->setIcon(style()->standardIcon(QStyle::SP_FileDialogDetailedView));
 
     newtab_menu.addAction(ui->actionAddTab);
     newtab_menu.addAction(ui->actionAddIncognitoTab);
@@ -204,7 +204,7 @@ void MainWindow::on_actionShowSettings_triggered()
     int index = ui->tabWidget->count() - 1;
     ui->tabWidget->insertTab(index, settings_page = new QScrollArea(this), "Settings");
     ui->tabWidget->setCurrentIndex(index);
-    ui->tabWidget->setTabIcon(index, style()->standardIcon(QStyle::SP_DriveNetIcon));
+    ui->tabWidget->setTabIcon(index, style()->standardIcon(QStyle::SP_FileDialogListView));
 
     SettingsPage * page;
     settings_page->setAlignment(Qt::AlignHCenter);
@@ -223,9 +223,11 @@ void MainWindow::on_actionShowDownloads_triggered()
     int index = ui->tabWidget->count() - 1;
     ui->tabWidget->insertTab(index, downloads_page = new DownloadsPage(this), "Downloads");
     ui->tabWidget->setCurrentIndex(index);
-    ui->tabWidget->setTabIcon(index, style()->standardIcon(QStyle::SP_DriveHDIcon));
+    ui->tabWidget->setTabIcon(index, style()->standardIcon(QStyle::SP_FileDialogDetailedView));
 
     SettingsPage::downloadsHistoryModel()->select();
+
+    connect(downloads_page, SIGNAL(newWindowLink(QUrl)), this, SLOT(newWindowLink(QUrl)));
 }
 
 void MainWindow::proxyChanged(SettingsPage::ProxyType proxy_type)

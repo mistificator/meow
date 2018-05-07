@@ -535,7 +535,7 @@ void WebPage::saveReplyToDisk(QNetworkReply * reply)
         file.write(data);
         file.close();
 
-        SettingsPage::addDownloadEntry(file.fileName(), url.toString(), current_url.toString(), file.size());
+        SettingsPage::addDownloadEntry(file.fileName(), url.toString(), current_url.toString(), file.size(), current_page_title, current_alt_text);
 
         if (SettingsPage::writeMetadataEnabed())
         {

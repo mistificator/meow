@@ -76,7 +76,7 @@ public:
     static bool clearCompleterHistory();
 
     static QSqlTableModel * downloadsHistoryModel();
-    static bool addDownloadEntry(QString file, QString url, QString page, qint64 size, QDateTime datetime = QDateTime::currentDateTime(), QString _namespace = QString());
+    static bool addDownloadEntry(QString file, QString url, QString page, qint64 size, QString title, QString description, QDateTime datetime = QDateTime::currentDateTime(), QString _namespace = QString());
     static bool clearDownloadsHistory();
 
     static QSqlDatabase databaseHistory();
