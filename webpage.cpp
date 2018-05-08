@@ -16,9 +16,11 @@
 #include <QTableView>
 #include <QStyledItemDelegate>
 #include <QNetworkConfiguration>
+#include <QInputDialog>
 
 #include "mainwindow.h"
 #include "tabbar.h"
+#include "utils.h"
 
 class UserAgentWebPage : public QWebPage
 {
@@ -172,7 +174,7 @@ QWebView * WebPage::view() const
 
 QWebPage * WebPage::page() const
 {
-    return view()->page();
+    return view() ? view()->page() : 0;
 }
 
 void WebPage::on_actionLoadPage_triggered()
@@ -251,12 +253,25 @@ void WebPage::on_webView_loadFinished(bool status)
         else
         {
             runUserScriptRecursive(page()->mainFrame());
+            if (current_url.toString().trimmed().compare("about:blank", Qt::CaseInsensitive) == 0) // draw cat
+            {
+                QStringList div_style = QStringList() << "position: absolute" << "top: 0" << "bottom: 0" << "left: 0" << "right: 0" << "margin: auto" << "width: 30%" << "height: 30%";
+                if (isIncognito())
+                {
+                    div_style << "opacity: 0.1";
+                }
+                page()->mainFrame()->setHtml(
+                            "<html><body><figure><div id=\"meow_cat\" style=\"" +
+                            div_style.join("; ") + "\">" +
+                            Meow::resourceString(":/Images/robocat.svg") +
+                            "</div></figure><script type=\"text/javascript\">var meow_cat=document.getElementById(\"meow_cat\");</script></body></html>");
+            }
         }
     }
     else
     {
         qDebug() << "loading failed!!!";
-//        page()->mainFrame()->setHtml("<html><body><div style=\"position: absolute; top: 0;bottom: 0; left: 0; right: 0; margin: auto; width: 200px; height: 100px;\"><h1>Loading failed</h1></div></body></html>", view()->url());
+//        page()->mainFrame()->setHtml("<html><body><div style=\"position: absolute; top: 0; bottom: 0; left: 0; right: 0; margin: auto; width: 200px; height: 100px;\"><h1>Loading failed</h1></div></body></html>", view()->url());
     }
     applyIcon();
     ui->progressBar->setValue(0);
@@ -314,7 +329,7 @@ void WebPage::applyTitle()
     }
     if (QTabWidget * tw = qobject_cast<QTabWidget *>(parent()->parent()))
     {
-        if (TabBar * tb = qobject_cast<TabBar *>(TabWidgetOpener::tabBar(tw)))
+        if (TabBar * tb = qobject_cast<TabBar *>(tw->tabBar()))
         {
             const int index = tw->indexOf(this);
             tw->setTabToolTip(index, title);
@@ -323,7 +338,6 @@ void WebPage::applyTitle()
     }
 }
 
-#include <QInputDialog>
 void WebPage::customContextMenuRequested(const QPoint & pos)
 {
     QMenu * menu = page()->createStandardContextMenu();

@@ -41,7 +41,8 @@ HEADERS  += mainwindow.h \
             settingspage.h \
             tabbar.h \
             version.h \
-    downloadspage.h
+    downloadspage.h \
+    utils.h
 
 FORMS    += mainwindow.ui \
             webpage.ui \

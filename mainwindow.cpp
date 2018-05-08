@@ -29,6 +29,14 @@ MainWindow::MainWindow(QWidget *parent) :
     QSslConfiguration::setDefaultConfiguration(conf);
 
     ui->setupUi(this);
+
+    // Set custom tab bar
+    bool movable = ui->tabWidget->isMovable();
+    bool closable = ui->tabWidget->tabsClosable();
+    TabWidgetOpener::setTabBar(ui->tabWidget, new TabBar(this));
+    ui->tabWidget->setMovable(movable);
+    ui->tabWidget->setTabsClosable(closable);
+
     ui->mainToolBar->hide();
 
     notifier = new QLabel(this);
@@ -54,17 +62,13 @@ MainWindow::MainWindow(QWidget *parent) :
     add_tab->setPopupMode(QToolButton::MenuButtonPopup);
     add_tab->setDefaultAction(SettingsPage::privacyPolicy() == SettingsPage::UsualPrivacy ? ui->actionAddTab : ui->actionAddIncognitoTab);
     add_tab->setMenu(& newtab_menu);
-    // Set custom tab bar
-    bool movable = ui->tabWidget->isMovable();
-    bool closable = ui->tabWidget->tabsClosable();
-    TabWidgetOpener::setTabBar(ui->tabWidget, new TabBar(this));
-    ui->tabWidget->setMovable(movable);
-    ui->tabWidget->setTabsClosable(closable);
     // Add empty, not enabled tab to tabWidget
     ui->tabWidget->addTab(new QWidget(), QString());
     ui->tabWidget->setTabEnabled(0, false);
     // Add tab button to current tab. Button will be enabled, but tab -- not
-    TabWidgetOpener::tabBar(ui->tabWidget)->setTabButton(0, QTabBar::RightSide, add_tab);
+    ui->tabWidget->tabBar()->setTabButton(0, QTabBar::RightSide, add_tab);
+    ui->tabWidget->tabBar()->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(ui->tabWidget->tabBar(), SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(tabCustomContextMenuRequested(QPoint)));
 
     QWebSettings::enablePersistentStorage(SettingsPage::tempDir());
     SettingsPage::loadScripts();
@@ -95,6 +99,7 @@ void MainWindow::on_actionAddTab_triggered()
     ui->tabWidget->insertTab(index, last_page = new WebPage(WebPage::UsualPrivacy, this), QString());
     ui->tabWidget->setCurrentIndex(index);
     ui->tabWidget->setTabIcon(index, last_page->windowIcon());
+    last_page->view()->load(QUrl("about:blank"));
 
     connect(last_page, SIGNAL(newWindowLink(QUrl)), this, SLOT(newWindowLink(QUrl)));
     connect(last_page, SIGNAL(linkHovered(QString, QString, QString)), this, SLOT(linkHovered(QString, QString, QString)));
@@ -106,9 +111,11 @@ void MainWindow::on_actionAddIncognitoTab_triggered()
     ui->tabWidget->insertTab(index, last_page = new WebPage(WebPage::IncognitoPrivacy, this), QString());
     ui->tabWidget->setCurrentIndex(index);
     ui->tabWidget->setTabIcon(index, last_page->windowIcon());
+    last_page->view()->load(QUrl("about:blank"));
 
     connect(last_page, SIGNAL(newWindowLink(QUrl)), this, SLOT(newWindowLink(QUrl)));
     connect(last_page, SIGNAL(linkHovered(QString, QString, QString)), this, SLOT(linkHovered(QString, QString, QString)));
+
 }
 
 void MainWindow::on_tabWidget_tabCloseRequested(int index)
@@ -301,3 +308,26 @@ void MainWindow::privacyChanged(SettingsPage::Privacy _privacy)
     add_tab->setDefaultAction(_privacy == SettingsPage::UsualPrivacy ? ui->actionAddTab : ui->actionAddIncognitoTab);
 }
 
+void MainWindow::tabCustomContextMenuRequested(const QPoint &pos)
+{
+    if (!ui->tabWidget->tabBar()->tabRect(ui->tabWidget->currentIndex()).contains(pos))
+    {
+        return;
+    }
+    QMenu menu;
+    WebPage * webpage = 0;
+    QAction * save_page = 0;
+    if (webpage = dynamic_cast<WebPage *>(ui->tabWidget->widget(ui->tabWidget->currentIndex())))
+    {
+        save_page = menu.addAction("Save page");
+    }
+    if (menu.actions().isEmpty())
+    {
+        return;
+    }
+    QAction * res = menu.exec(ui->tabWidget->tabBar()->mapToGlobal(pos));
+    if (res == save_page)
+    {
+        // TODO:
+    }
+}

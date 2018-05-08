@@ -36,7 +36,7 @@ private slots:
     void proxyChanged(SettingsPage::ProxyType);
     void privacyChanged(SettingsPage::Privacy);
     void on_actionShowDownloads_triggered();
-
+    void tabCustomContextMenuRequested(const QPoint &pos);
 private:
     Ui::MainWindow *ui;
     QString temp_dir;
