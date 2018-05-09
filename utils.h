@@ -20,7 +20,7 @@ namespace Meow
         return str;
     }
 
-    QRegExp undesiredSymbols(QString str = "\"&,\\:?/")
+    QRegExp undesiredSymbols(QString str = "\"&,\\:?/*|<>")
     {
         return QRegExp("[" + str + "]");
     }

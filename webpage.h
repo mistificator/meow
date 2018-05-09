@@ -75,7 +75,8 @@ private:
     QString script;
     QWebInspector * inspector;
     QCompleter * completer;
-    QString save_page_path;
+    struct SavePageStruct;
+    SavePageStruct * save_page;
     void setIncognito();
     void applyIcon();
     void applyTitle();

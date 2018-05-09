@@ -18,6 +18,7 @@
 #include <QNetworkConfiguration>
 #include <QInputDialog>
 #include <QStandardPaths>
+#include <QProgressDialog>
 
 #include "mainwindow.h"
 #include "tabbar.h"
@@ -25,11 +26,53 @@
 #include "custom_classes.h"
 #include "web_mime_types.h"
 
+struct WebPage::SavePageStruct
+{
+    SavePageStruct(QString _path = QString())
+    {
+        activate(_path);
+        switchRelative();
+    }
+    void activate(QString _path)
+    {
+        p_path = _path;
+    }
+    QString path() const
+    {
+        return p_path;
+    }
+    bool isActive() const
+    {
+        return !p_path.isEmpty();
+    }
+    void switchRelative()
+    {
+        p_root = false;
+    }
+    void switchRoot()
+    {
+        p_root = true;
+    }
+    bool isRoot() const
+    {
+        return p_root;
+    }
+    void reset()
+    {
+        p_path.clear();
+    }
+private:
+    QString p_path;
+    bool p_root;
+};
+
+
 WebPage::WebPage(Privacy _privacy, QWidget *parent) :
     QWidget(parent),
     ui(new Ui::WebPage),
     privacy(_privacy),
-    script("// sample script\r\ndocument.title = \"This is the new page title.\";")
+    script("// sample script\r\ndocument.title = \"This is the new page title.\";"),
+    save_page(new SavePageStruct())
 {
     ui->setupUi(this);
 
@@ -111,11 +154,15 @@ WebPage::WebPage(Privacy _privacy, QWidget *parent) :
     {
         setWindowIcon(style()->standardIcon(QStyle::SP_DesktopIcon));
     }
+
+    page()->networkAccessManager()->setCookieJar(new SharedCookieJar((SettingsPage::Privacy)privacy));
 }
 
 WebPage::~WebPage()
 {
+    page()->networkAccessManager()->setCookieJar(new QNetworkCookieJar()); // force prev jar dtor calling
     delete ui;
+    delete save_page;
 }
 
 QWebView * WebPage::view() const
@@ -485,7 +532,7 @@ void WebPage::saveReplyToDisk(QNetworkReply * reply)
     if ((!content_type.startsWith(request_content_type) || request_content_type.isEmpty()) &&
             content_type.contains("text/html", Qt::CaseInsensitive) &&
             !property("temporary").toBool() &&
-            save_page_path.isEmpty())
+            !save_page->isActive())
     {
         qDebug() << "redirect detected" <<
                     url <<
@@ -494,7 +541,7 @@ void WebPage::saveReplyToDisk(QNetworkReply * reply)
         WebPage * redirect_page = new WebPage(privacy, this);
         redirect_page->hide();
         connect(redirect_page, SIGNAL(downloadFinished()), this, SIGNAL(downloadFinished()));
-        redirect_page->save_page_path = save_page_path;
+        redirect_page->save_page = save_page;
         redirect_page->setProperty("requested_url", url);
         redirect_page->setProperty("temporary", true);
         redirect_page->load(url);
@@ -511,7 +558,7 @@ void WebPage::saveReplyToDisk(const QUrl & url, const QByteArray & data, QString
     QString filename = Meow::excludeUndesiredSymbols(QFileInfo(url_adjusted).fileName());
     filename = adjustFilename(filename, content_type, data);
     QString path;
-    if (save_page_path.isEmpty())
+    if (!save_page->isActive())
     {
         switch (SettingsPage::savePolicy())
         {
@@ -531,7 +578,7 @@ void WebPage::saveReplyToDisk(const QUrl & url, const QByteArray & data, QString
             {
             //    QString dir = QFileInfo(url_adjusted).dir().path();
                 QString dir = QFileInfo(current_url.toString(QUrl::RemoveScheme | QUrl::RemovePort)).dir().path();
-                qDebug() << "download" << dir << filename;
+//                qDebug() << "download" << dir << filename;
                 path = SettingsPage::savePath() + "/" + dir + "/";
                 QDir().mkpath(path);
             }
@@ -540,12 +587,18 @@ void WebPage::saveReplyToDisk(const QUrl & url, const QByteArray & data, QString
     }
     else
     {
-        path = save_page_path + "/";
+        QString dir = QFileInfo(current_url.toString(QUrl::RemoveScheme | QUrl::RemovePort)).dir().path();
+        path = save_page->path() + "/";
+        if (!save_page->isRoot())
+        {
+            path += dir +"/";
+        }
+        QDir().mkpath(path);
         int i = 2;
         QString src_filename = filename;
         while (QFile::exists(path + filename))
         {
-            filename = QFileInfo(src_filename).baseName() + " (" + QString::number(i) + ")." + QFileInfo(src_filename).completeSuffix();
+            filename = QFileInfo(src_filename).baseName() + "_" + QString::number(i) + "." + QFileInfo(src_filename).completeSuffix();
             i++;
         }
     }
@@ -572,7 +625,7 @@ void WebPage::saveReplyToDisk(const QUrl & url, const QByteArray & data, QString
                         );
         }
 
-        if (SettingsPage::savePolicy() == SettingsPage::SaveSilent)
+        if (SettingsPage::savePolicy() == SettingsPage::SaveSilent && !save_page->isActive())
         {
             QString link;
             int count = 0;
@@ -678,23 +731,58 @@ void WebPage::downloadRequest(const QNetworkRequest & request)
 
 void WebPage::saveCurrentPage()
 {
-    view()->stop();
     qDebug() << "save page";
-    save_page_path = QStandardPaths::standardLocations(QStandardPaths::DownloadLocation).at(0) + "/meow/pages/" + Meow::excludeUndesiredSymbols(current_page_title) + "/";
-    QDir().mkpath(save_page_path);
+    save_page->switchRelative();
+    if (SettingsPage::savePolicy() == SettingsPage::SaveAsk)
+    {
+        QString path = QFileDialog::getExistingDirectory(topLevelWidget(), "Folder to save page", SettingsPage::currentSavePath());
+        if (path.isEmpty())
+        {
+            return;
+        }
+        SettingsPage::setCurrentSavePath(path);
+        save_page->activate(path);
+    }
+    else
+    {
+        save_page->activate(SettingsPage::savePath() + "/pages/" + Meow::excludeUndesiredSymbols(current_page_title) + "/");
+    }
+    setEnabled(false);
+    QProgressDialog * progress = new QProgressDialog(view());
+    progress->setWindowTitle("Saving page");
+    progress->setWindowFlags(Qt::CustomizeWindowHint | Qt::Tool | Qt::WindowCloseButtonHint);
+    progress->setMinimumDuration(2000);
+    view()->stop();
+    QDir().mkpath(save_page->path());
     QWebElement document = page()->mainFrame()->documentElement();
     QMultiMap< QString, QList<QWebElement> > map;
-    map.insertMulti("src", document.findAll("img").toList());
-    map.insertMulti("src", document.findAll("script").toList());
-    map.insertMulti("href", document.findAll("link").toList());
-    map.insertMulti("href", document.findAll("a").toList());
+    QList<QWebElement> list;
+    int count = 0;
+    list = document.findAll("img").toList(); count += list.count();
+    map.insertMulti("src", list);
+    list = document.findAll("script").toList(); count += list.count();
+    map.insertMulti("src", list);
+    list = document.findAll("link").toList(); count += list.count();
+    map.insertMulti("href", list);
+    list = document.findAll("a").toList(); count += list.count();
+    map.insertMulti("href", list);
+    progress->setMaximum(count);
+    progress->setWindowModality(Qt::NonModal);
+    int k = 0;
     for (QMultiMap< QString, QList<QWebElement> >::iterator i = map.begin(); i != map.end(); ++i)
     {
+        if (progress->wasCanceled())
+        {
+            break;
+        }
         QString url_attr = i.key();
         foreach (QWebElement el, i.value())
         {
+            progress->setValue(k++);
             QUrl url(el.attribute(url_attr));
-            if (url.isEmpty() || url.toString().endsWith(".ico", Qt::CaseInsensitive) || url.toString() == "#")
+            if (url.isEmpty() ||
+                    (el.tagName().compare("img", Qt::CaseInsensitive) == 0 && url.toString().endsWith(".ico", Qt::CaseInsensitive)) ||
+                    (el.tagName().compare("a", Qt::CaseInsensitive) == 0 && url.toString() == "#"))
             {
                 continue;
             }
@@ -708,19 +796,31 @@ void WebPage::saveCurrentPage()
             {
                 url.setScheme(current_url.scheme());
             }
+            if (el.tagName().compare("a", Qt::CaseInsensitive) == 0)
+            {
+                el.setAttribute(url_attr, url.toString());
+                continue;
+            }
 //            qDebug() << url;
             QEventLoop loop;
             connect(this, SIGNAL(downloadFinished()), & loop, SLOT(quit()));
             downloadRequest(CustomNetworkRequest(QUrl(current_url.host()).resolved(url)));
             loop.exec();
             QDir().mkpath(QFileInfo(last_file_name).absolutePath());
-            el.setAttribute(url_attr, "file:///" + last_file_name);
+//            qDebug() << "saving" << url << last_file_name;
+//            el.setAttribute(url_attr, "file:///" + last_file_name);
+             el.setAttribute(url_attr, QDir(save_page->path()).relativeFilePath(last_file_name));
         }
     }
+    save_page->switchRoot();
     saveReplyToDisk(Meow::excludeUndesiredSymbols(current_page_title) + ".html", page()->mainFrame()->toHtml().toUtf8(), "text/html");
-    QString full_path = "file:///" + save_page_path + Meow::excludeUndesiredSymbols(current_page_title) + ".html";
-    save_page_path.clear();
+//    QString full_path = "file:///" + save_page.path + Meow::excludeUndesiredSymbols(current_page_title) + ".html";
+    QString full_path = "file:///" + last_file_name;
+    save_page->reset();
     load(full_path);
+    progress->hide();
+    progress->deleteLater();
+    setEnabled(true);
 }
 
 void WebPage::unsupportedContent(QNetworkReply * reply)

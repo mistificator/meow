@@ -7,6 +7,10 @@
 #include <QtWebKitWidgets/QWebPage>
 #include <QStyledItemDelegate>
 #include <QtSql/QSqlTableModel>
+#include <QNetworkCookieJar>
+#include <QNetworkCookie>
+#include <QFile>
+#include <QDebug>
 
 #include "settingspage.h"
 
@@ -65,13 +69,18 @@ public:
 class CustomNetworkRequest: public QNetworkRequest
 {
 public:
-    CustomNetworkRequest(const QUrl &url, KnownHeaders header = (KnownHeaders)-1, QVariant value = QVariant()): QNetworkRequest(url)
+    struct Headers
+    {
+        QByteArray header;
+        QByteArray value;
+    };
+    CustomNetworkRequest(const QUrl &url, QList<Headers> headers = QList<Headers>()): QNetworkRequest(url)
     {
         setAttribute(QNetworkRequest::HTTP2AllowedAttribute, true);
         setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-        if (header != (KnownHeaders)-1)
+        foreach (const Headers & header, headers)
         {
-            setHeader(header, value);
+            setRawHeader(header.header, header.value);
         }
     }
 };
@@ -137,6 +146,119 @@ protected:
         size /= 1024;
         return QString::number(size) + " Gb";
     }
+};
+
+// idea from https://stackoverflow.com/questions/13971787/how-do-i-save-cookies-with-qt
+class SharedCookieJar: public QNetworkCookieJar
+{
+public:
+    SharedCookieJar(SettingsPage::Privacy _privacy, QObject *parent = 0) : QNetworkCookieJar(parent), privacy(_privacy)
+    {
+        if (privacy == SettingsPage::UsualPrivacy && * refCount(privacy) == 0)
+        {
+            qDebug() << "read cookies from" << SettingsPage::appDataDir() + "/cookies.";
+            QFile file(SettingsPage::appDataDir() + "/cookies.");
+            if (file.open(QFile::ReadOnly))
+            {
+                JarOpener::setAllCookies(sharedJar(privacy), QNetworkCookie::parseCookies(file.readAll()));
+                file.close();
+            }
+        }
+        (* refCount(privacy))++;
+//        setAllCookies(JarOpener::allCookies(sharedJar()));
+    }
+    virtual ~SharedCookieJar()
+    {
+        (* refCount(privacy))--;
+        if (* refCount(privacy) == 0)
+        {
+            if (privacy == SettingsPage::UsualPrivacy)
+            {
+                QByteArray data;
+                foreach (QNetworkCookie cookie, JarOpener::allCookies(sharedJar(privacy)))
+                {
+                    if (!cookie.isSessionCookie())
+                    {
+                        data.append(cookie.toRawForm());
+                        data.append("\n");
+                    }
+                }
+                qDebug() << "write cookies to" << SettingsPage::appDataDir() + "/cookies.";
+                QFile file(SettingsPage::appDataDir() + "/cookies.");
+                if (file.open(QFile::WriteOnly))
+                {
+                    file.write(data);
+                    file.close();
+                }
+            }
+            delete refCount(privacy);
+            delete sharedJar(privacy);
+        }
+    }
+    virtual QList<QNetworkCookie> cookiesForUrl(const QUrl &url) const
+    {
+        return sharedJar(privacy)->cookiesForUrl(url);
+    }
+
+    virtual bool setCookiesFromUrl(const QList<QNetworkCookie> &cookieList, const QUrl &url)
+    {
+        return sharedJar(privacy)->setCookiesFromUrl(cookieList, url);
+    }
+
+    virtual bool deleteCookie(const QNetworkCookie &cookie)
+    {
+        return sharedJar(privacy)->deleteCookie(cookie);
+    }
+    virtual bool insertCookie(const QNetworkCookie &cookie)
+    {
+        return sharedJar(privacy)->insertCookie(cookie);
+    }
+    virtual bool updateCookie(const QNetworkCookie &cookie)
+    {
+        return sharedJar(privacy)->updateCookie(cookie);
+    }
+protected:
+    virtual bool validateCookie(const QNetworkCookie &cookie, const QUrl &url) const
+    {
+        return JarOpener::validateCookie(sharedJar(privacy), cookie, url);
+    }
+private:
+    SettingsPage::Privacy privacy;
+    static int * & refCount(SettingsPage::Privacy privacy)
+    {
+        static int * ref_count[2] = {0, 0};
+        if (ref_count[privacy] == 0)
+        {
+            ref_count[privacy] = new int;
+            * ref_count[privacy] = 0;
+        }
+        return ref_count[privacy];
+    }
+    static QNetworkCookieJar * & sharedJar(SettingsPage::Privacy privacy)
+    {
+        static QNetworkCookieJar * jar[2] = {0, 0};
+        if (jar[privacy] == 0)
+        {
+            jar[privacy] = new QNetworkCookieJar();
+        }
+        return jar[privacy];
+    }
+    class JarOpener: public QNetworkCookieJar
+    {
+    public:
+        static QList<QNetworkCookie> allCookies(QNetworkCookieJar * jar)
+        {
+            return ((JarOpener *)jar)->QNetworkCookieJar::allCookies();
+        }
+        static bool validateCookie(QNetworkCookieJar * jar, const QNetworkCookie &cookie, const QUrl &url)
+        {
+            return ((JarOpener *)jar)->QNetworkCookieJar::validateCookie(cookie, url);
+        }
+        static void setAllCookies(QNetworkCookieJar * jar, const QList<QNetworkCookie> &cookieList)
+        {
+            ((JarOpener *)jar)->QNetworkCookieJar::setAllCookies(cookieList);
+        }
+    };
 };
 
 #endif // CUSTOM_CLASSES_H

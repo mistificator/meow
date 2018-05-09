@@ -27,7 +27,7 @@ MainWindow::MainWindow(QWidget *parent) :
 //    QWebSettings::globalSettings()->setAttribute(QWebSettings::DnsPrefetchEnabled, true);
 
     QSslConfiguration conf = QSslConfiguration::defaultConfiguration();
-    conf.setPeerVerifyMode(QSslSocket::QueryPeer);
+    conf.setPeerVerifyMode(QSslSocket::VerifyNone);
     QSslConfiguration::setDefaultConfiguration(conf);
 
     ui->setupUi(this);
@@ -343,7 +343,10 @@ void MainWindow::on_actionDownloadPage_triggered()
 {
     if (WebPage * webpage = dynamic_cast<WebPage *>(ui->tabWidget->widget(ui->tabWidget->currentIndex())))
     {
-         webpage->downloadRequest(CustomNetworkRequest(webpage->view()->url(), QNetworkRequest::ContentTypeHeader, "text/html"));
+         CustomNetworkRequest::Headers h;
+         h.header = "Content-Type";
+         h.value = "text/html";
+         webpage->downloadRequest(CustomNetworkRequest(webpage->view()->url(), QList<CustomNetworkRequest::Headers>() << h));
     }
 }
 
