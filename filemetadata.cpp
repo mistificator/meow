@@ -1,6 +1,9 @@
 #include "filemetadata.h"
-#include <QImageReader>
+//#include <QImageReader>
 #include <QDebug>
+#include <QFileInfo>
+
+#include "web_mime_types.h"
 
 // based on https://msdn.microsoft.com/en-us/library/windows/desktop/ms533832(v=vs.85).aspx
 #include <windows.h>
@@ -92,7 +95,8 @@ FileMetadata::~FileMetadata()
 bool FileMetadata::setImage(QString filename)
 {
     d->filename = filename;
-    d->format = "image/" + QImageReader(filename).format().toLower().replace("jpg", "jpeg");
+//    d->format = "image/" + QImageReader(filename).format().toLower().replace("jpg", "jpeg");
+    d->format = Meow::contentTypeForSuffix(QFileInfo(filename).suffix());
     // Get the CLSID of encoder.
     d->image_set_up = Data::GetEncoderClsid((wchar_t *)d->format.utf16(), &d->clsid) >= 0;
     return d->image_set_up;

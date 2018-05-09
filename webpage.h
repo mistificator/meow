@@ -28,6 +28,11 @@ public:
     QWebView * view() const;
     QWebPage * page() const;
     bool isIncognito() const;
+    void load(const QUrl & url);
+public slots:
+    void downloadRequest(const QNetworkRequest & request);
+    void saveCurrentPage();
+    void runScript();
 private slots:
     void on_actionLoadPage_triggered();
     void on_actionReloadPage_triggered();
@@ -51,8 +56,8 @@ private slots:
     void replyFinished(QNetworkReply *);
     void linkClicked(QUrl);
     void initialLayoutCompleted();
-    void downloadRequested(const QNetworkRequest & request);
     void unsupportedContent(QNetworkReply * reply);
+    void redirected(const QUrl &url);
     void featurePermissionRequested(QWebFrame* frame, QWebPage::Feature feature);
     void frameCreated(QWebFrame * frame);
 
@@ -63,20 +68,22 @@ private:
     QPoint current_pos;
     QString current_page_title;
     QString current_alt_text;
+    QString last_file_name;
     QNetworkAccessManager * manager;
     FileMetadata fmeta;
     Privacy privacy;
     QString script;
     QWebInspector * inspector;
     QCompleter * completer;
+    QString save_page_path;
     void setIncognito();
     void applyIcon();
     void applyTitle();
     QWebHitTestResult hitTest(QPoint) const;
-    static QString adjustFilename(QString filename, const QByteArray & data);
+    static QString adjustFilename(QString filename, QString content, const QByteArray & data);
     void saveReplyToDisk(QNetworkReply * reply);
+    void saveReplyToDisk(const QUrl & url, const QByteArray & data, QString content_type);
     void modifyExif(QString filename, QUrl file_url, QUrl page_url, QStringList tags);
-    QRegExp undesiredSymbols(QString str = "\"&,\\:?/") const;
     void runUserScriptRecursive(QWebFrame *);
     void updateCompleter(QString, QString);
 protected:
@@ -85,6 +92,7 @@ signals:
     void newWindowLink(QUrl);
     void linkHovered(const QString & link, const QString & title, const QString & textContent);
     void showNotifier(QString, int timeout = 5000);
+    void downloadFinished();
 };
 
 #endif // WEBPAGE_H

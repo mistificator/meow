@@ -15,22 +15,10 @@
     #include <QStandardPaths>
 #endif
 
+#include "custom_classes.h"
+
 int SettingsPage::loaded_scripts_count = 0;
 QString SettingsPage::user_script;
-
-class HintSqlTableModel: public QSqlTableModel
-{
-public:
-    HintSqlTableModel(QObject * _parent = 0, QSqlDatabase db = QSqlDatabase()): QSqlTableModel(_parent, db) {}
-    QVariant data(const QModelIndex &idx, int role = Qt::DisplayRole) const
-    {
-        if (role == Qt::ToolTipRole)
-        {
-            return QSqlTableModel::data(idx, Qt::DisplayRole);
-        }
-        return QSqlTableModel::data(idx, role);
-    }
-};
 
 SettingsPage::SettingsPage(QWidget *parent) :
     QWidget(parent),

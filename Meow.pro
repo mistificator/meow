@@ -42,7 +42,9 @@ HEADERS  += mainwindow.h \
             tabbar.h \
             version.h \
     downloadspage.h \
-    utils.h
+    utils.h \
+    custom_classes.h \
+    web_mime_types.h
 
 FORMS    += mainwindow.ui \
             webpage.ui \

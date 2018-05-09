@@ -14,6 +14,8 @@
 #include <QSslConfiguration>
 #include <QSslSocket>
 
+#include "custom_classes.h"
+
 MainWindow::MainWindow(QWidget *parent) :
     QMainWindow(parent),
     ui(new Ui::MainWindow),
@@ -99,7 +101,7 @@ void MainWindow::on_actionAddTab_triggered()
     ui->tabWidget->insertTab(index, last_page = new WebPage(WebPage::UsualPrivacy, this), QString());
     ui->tabWidget->setCurrentIndex(index);
     ui->tabWidget->setTabIcon(index, last_page->windowIcon());
-    last_page->view()->load(QUrl("about:blank"));
+    last_page->load(QUrl("about:blank"));
 
     connect(last_page, SIGNAL(newWindowLink(QUrl)), this, SLOT(newWindowLink(QUrl)));
     connect(last_page, SIGNAL(linkHovered(QString, QString, QString)), this, SLOT(linkHovered(QString, QString, QString)));
@@ -111,7 +113,7 @@ void MainWindow::on_actionAddIncognitoTab_triggered()
     ui->tabWidget->insertTab(index, last_page = new WebPage(WebPage::IncognitoPrivacy, this), QString());
     ui->tabWidget->setCurrentIndex(index);
     ui->tabWidget->setTabIcon(index, last_page->windowIcon());
-    last_page->view()->load(QUrl("about:blank"));
+    last_page->load(QUrl("about:blank"));
 
     connect(last_page, SIGNAL(newWindowLink(QUrl)), this, SLOT(newWindowLink(QUrl)));
     connect(last_page, SIGNAL(linkHovered(QString, QString, QString)), this, SLOT(linkHovered(QString, QString, QString)));
@@ -126,7 +128,7 @@ void MainWindow::on_tabWidget_tabCloseRequested(int index)
     ui->tabWidget->removeTab(index);
     if (WebPage * page = dynamic_cast<WebPage *>(w))
     {
-        page->view()->load(QUrl("about:blank"));
+        page->load(QUrl("about:blank"));
     }
     if (w == settings_page)
     {
@@ -156,7 +158,7 @@ void MainWindow::newWindowLink(QUrl url)
     {
         ui->actionAddIncognitoTab->trigger();
     }
-    last_page->view()->load(url);
+    last_page->load(url);
 }
 
 void MainWindow::linkHovered(const QString & link, const QString &, const QString &)
@@ -315,19 +317,40 @@ void MainWindow::tabCustomContextMenuRequested(const QPoint &pos)
         return;
     }
     QMenu menu;
-    WebPage * webpage = 0;
-    QAction * save_page = 0;
-    if (webpage = dynamic_cast<WebPage *>(ui->tabWidget->widget(ui->tabWidget->currentIndex())))
+    if (WebPage * webpage = dynamic_cast<WebPage *>(ui->tabWidget->widget(ui->tabWidget->currentIndex())))
     {
-        save_page = menu.addAction("Save page");
+        menu.addAction(ui->actionSavePage);
+        menu.addAction(ui->actionDownloadPage);
+        menu.addSeparator();
+        menu.addAction(ui->actionRunScript);
     }
     if (menu.actions().isEmpty())
     {
         return;
     }
-    QAction * res = menu.exec(ui->tabWidget->tabBar()->mapToGlobal(pos));
-    if (res == save_page)
+    menu.exec(ui->tabWidget->tabBar()->mapToGlobal(pos));
+}
+
+void MainWindow::on_actionSavePage_triggered()
+{
+    if (WebPage * webpage = dynamic_cast<WebPage *>(ui->tabWidget->widget(ui->tabWidget->currentIndex())))
     {
-        // TODO:
+         webpage->saveCurrentPage();
+    }
+}
+
+void MainWindow::on_actionDownloadPage_triggered()
+{
+    if (WebPage * webpage = dynamic_cast<WebPage *>(ui->tabWidget->widget(ui->tabWidget->currentIndex())))
+    {
+         webpage->downloadRequest(CustomNetworkRequest(webpage->view()->url(), QNetworkRequest::ContentTypeHeader, "text/html"));
+    }
+}
+
+void MainWindow::on_actionRunScript_triggered()
+{
+    if (WebPage * webpage = dynamic_cast<WebPage *>(ui->tabWidget->widget(ui->tabWidget->currentIndex())))
+    {
+        webpage->runScript();
     }
 }

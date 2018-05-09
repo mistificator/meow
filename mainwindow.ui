@@ -60,7 +60,7 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>21</height>
+     <height>26</height>
     </rect>
    </property>
   </widget>
@@ -112,6 +112,30 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+J</string>
+   </property>
+  </action>
+  <action name="actionSavePage">
+   <property name="text">
+    <string>Save page</string>
+   </property>
+   <property name="toolTip">
+    <string>Save page</string>
+   </property>
+  </action>
+  <action name="actionDownloadPage">
+   <property name="text">
+    <string>Download page</string>
+   </property>
+   <property name="toolTip">
+    <string>Download page</string>
+   </property>
+  </action>
+  <action name="actionRunScript">
+   <property name="text">
+    <string>Run script</string>
+   </property>
+   <property name="toolTip">
+    <string>Run script</string>
    </property>
   </action>
  </widget>

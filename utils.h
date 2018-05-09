@@ -4,6 +4,7 @@
 #include <QFile>
 #include <QTextStream>
 #include <QDebug>
+#include <QRegExp>
 
 namespace Meow
 {
@@ -17,6 +18,15 @@ namespace Meow
             file.close();
         }
         return str;
+    }
+
+    QRegExp undesiredSymbols(QString str = "\"&,\\:?/")
+    {
+        return QRegExp("[" + str + "]");
+    }
+    QString excludeUndesiredSymbols(QString source, QString replacer = QString(), QRegExp undesired_symbols = undesiredSymbols())
+    {
+        return source.replace(undesired_symbols, replacer);
     }
 }
 

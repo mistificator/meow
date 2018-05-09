@@ -24,9 +24,7 @@ private slots:
     void on_openPage_clicked();
     void on_clearHistory_clicked();
     void on_searchBox_textChanged(const QString &arg1);
-
     void on_openFile_clicked();
-
 private:
     Ui::DownloadsPage *ui;
 };

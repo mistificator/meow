@@ -10,55 +10,7 @@
 #include <QMessageBox>
 #include <QProcess>
 
-
-class DownloadsUrlColumnDelegate: public QStyledItemDelegate
-{
-public:
-    DownloadsUrlColumnDelegate(QObject * _parent = 0): QStyledItemDelegate(_parent) {}
-protected:
-    QString displayText(const QVariant & value, const QLocale &) const
-    {
-        return QFileInfo(value.toString()).fileName();
-    }
-};
-
-class DownloadsTimeColumnDelegate: public QStyledItemDelegate
-{
-public:
-    DownloadsTimeColumnDelegate(QObject * _parent = 0): QStyledItemDelegate(_parent) {}
-protected:
-    QString displayText(const QVariant & value, const QLocale &) const
-    {
-        return QDateTime::fromString(value.toString(), "yyyy-MM-ddThh:mm:ss.zzz").toString("hh:mm, dd.MM");
-    }
-};
-
-class DownloadsSizeColumnDelegate: public QStyledItemDelegate
-{
-public:
-    DownloadsSizeColumnDelegate(QObject * _parent = 0): QStyledItemDelegate(_parent) {}
-protected:
-    QString displayText(const QVariant & value, const QLocale &) const
-    {
-        qint64 size = value.toLongLong();
-        if (size < 0.9 * 1024)
-        {
-            return QString::number(size) + " b";
-        }
-        size /= 1024;
-        if (size < 0.9 * 1024)
-        {
-            return QString::number(size) + " Kb";
-        }
-        size /= 1024;
-        if (size < 0.9 * 1024)
-        {
-            return QString::number(size) + " Mb";
-        }
-        size /= 1024;
-        return QString::number(size) + " Gb";
-    }
-};
+#include "custom_classes.h"
 
 DownloadsPage::DownloadsPage(QWidget *parent) :
     QWidget(parent),

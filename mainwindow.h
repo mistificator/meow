@@ -37,6 +37,12 @@ private slots:
     void privacyChanged(SettingsPage::Privacy);
     void on_actionShowDownloads_triggered();
     void tabCustomContextMenuRequested(const QPoint &pos);
+    void on_actionSavePage_triggered();
+
+    void on_actionDownloadPage_triggered();
+
+    void on_actionRunScript_triggered();
+
 private:
     Ui::MainWindow *ui;
     QString temp_dir;
