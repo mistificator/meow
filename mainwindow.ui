@@ -121,6 +121,9 @@
    <property name="toolTip">
     <string>Save page</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+S</string>
+   </property>
   </action>
   <action name="actionDownloadPage">
    <property name="text">
@@ -136,6 +139,17 @@
    </property>
    <property name="toolTip">
     <string>Run script</string>
+   </property>
+  </action>
+  <action name="actionInspectPage">
+   <property name="text">
+    <string>Inspect page</string>
+   </property>
+   <property name="toolTip">
+    <string>Inspect page</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Shift+I</string>
    </property>
   </action>
  </widget>

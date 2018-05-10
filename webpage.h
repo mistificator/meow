@@ -33,6 +33,7 @@ public slots:
     void downloadRequest(const QNetworkRequest & request);
     void saveCurrentPage();
     void runScript();
+    void inspectCurrentElement();
 private slots:
     void on_actionLoadPage_triggered();
     void on_actionReloadPage_triggered();
@@ -51,7 +52,6 @@ private slots:
     void actionOpenImageInNewWindow();
     void actionDownloadLinkToDisk();
     void actionDownloadImageToDisk();
-    void actionInspectElement();
 
     void replyFinished(QNetworkReply *);
     void linkClicked(QUrl);

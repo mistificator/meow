@@ -105,7 +105,7 @@ WebPage::WebPage(Privacy _privacy, QWidget *parent) :
     connect(view()->pageAction(QWebPage::OpenImageInNewWindow), SIGNAL(triggered()), this, SLOT(actionOpenImageInNewWindow()));
     connect(view()->pageAction(QWebPage::DownloadLinkToDisk), SIGNAL(triggered()), this, SLOT(actionDownloadLinkToDisk()));
     connect(view()->pageAction(QWebPage::DownloadImageToDisk), SIGNAL(triggered()), this, SLOT(actionDownloadImageToDisk()));
-    connect(view()->pageAction(QWebPage::InspectElement), SIGNAL(triggered()), this, SLOT(actionInspectElement()));
+    connect(view()->pageAction(QWebPage::InspectElement), SIGNAL(triggered()), this, SLOT(inspectCurrentElement()));
 
     ui->actionLoadPage->setIcon(style()->standardIcon(QStyle::SP_CommandLink));
     ui->actionReloadPage->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
@@ -156,6 +156,7 @@ WebPage::WebPage(Privacy _privacy, QWidget *parent) :
     }
 
     page()->networkAccessManager()->setCookieJar(new SharedCookieJar((SettingsPage::Privacy)privacy));
+    manager->setCookieJar(new SharedCookieJar((SettingsPage::Privacy)privacy));
 }
 
 WebPage::~WebPage()
@@ -860,7 +861,7 @@ void WebPage::updownProgress(qint64 processed, qint64 total)
     }
 }
 
-void WebPage::actionInspectElement()
+void WebPage::inspectCurrentElement()
 {
     ui->dockWidget->show();
 }

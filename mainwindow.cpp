@@ -321,6 +321,7 @@ void MainWindow::tabCustomContextMenuRequested(const QPoint &pos)
     {
         menu.addAction(ui->actionSavePage);
         menu.addAction(ui->actionDownloadPage);
+        menu.addAction(ui->actionInspectPage);
         menu.addSeparator();
         menu.addAction(ui->actionRunScript);
     }
@@ -355,5 +356,13 @@ void MainWindow::on_actionRunScript_triggered()
     if (WebPage * webpage = dynamic_cast<WebPage *>(ui->tabWidget->widget(ui->tabWidget->currentIndex())))
     {
         webpage->runScript();
+    }
+}
+
+void MainWindow::on_actionInspectPage_triggered()
+{
+    if (WebPage * webpage = dynamic_cast<WebPage *>(ui->tabWidget->widget(ui->tabWidget->currentIndex())))
+    {
+        webpage->inspectCurrentElement();
     }
 }
