@@ -588,7 +588,8 @@ void WebPage::saveReplyToDisk(const QUrl & url, const QByteArray & data, QString
     }
     else
     {
-        QString dir = QFileInfo(current_url.toString(QUrl::RemoveScheme | QUrl::RemovePort)).dir().path();
+        QString dir = QFileInfo(url_adjusted).dir().path();
+//        QString dir = QFileInfo(current_url.toString(QUrl::RemoveScheme | QUrl::RemovePort)).dir().path();
         path = save_page->path() + "/";
         if (!save_page->isRoot())
         {
@@ -730,6 +731,88 @@ void WebPage::downloadRequest(const QNetworkRequest & request)
     qDebug() << "downloading started";
 }
 
+QString WebPage::parseCssBgImageUrl(const QString & css, int & pos)
+{
+    if (pos < 0)
+    {
+        return QString();
+    }
+    pos = css.indexOf("background-image", pos);
+    if (pos < 0)
+    {
+        pos = css.indexOf("data-image", pos);
+        if (pos < 0)
+        {
+            return QString();
+        }
+    }
+    pos += 16;
+    int start = css.indexOf("url(", pos);
+    if (start >= 0 && start - pos > 2)
+    {
+        return QString();
+    }
+    pos = start;
+    if (start >= 0)
+    {
+        start += 4;
+        int end = css.indexOf(")", start);
+        if (end > start)
+        {
+            pos = end;
+            QString value = css.mid(start, end - start).replace(QRegExp("[\"']"), "");
+            if (!value.startsWith("data:"))
+            {
+                qDebug() << "background-image" << value;
+                return value;
+            }
+        }
+        else
+        {
+            pos = css.length();
+        }
+    }
+    return QString();
+}
+
+QString WebPage::savePageElement(QString tag, QString attr, QString value)
+{
+    if (value.isEmpty() ||
+            (tag.compare("img", Qt::CaseInsensitive) == 0 && value.endsWith(".ico", Qt::CaseInsensitive)) ||
+            (tag.compare("a", Qt::CaseInsensitive) == 0 && value == "#"))
+    {
+        return QString();
+    }
+    if (attr == "style")
+    {
+        int pos = 0;
+        value = parseCssBgImageUrl(value, pos);
+        if (pos == -1 || value.isEmpty())
+        {
+            return QString();
+        }
+    }
+    QUrl url(value);
+    if (url.host().isEmpty())
+    {
+        url = QUrl("//" + current_url.host() + url.toString());
+    }
+    if (url.scheme().isEmpty())
+    {
+        url.setScheme(current_url.scheme());
+    }
+    if (tag.compare("a", Qt::CaseInsensitive) == 0)
+    {
+        return url.toString();
+    }
+    QEventLoop loop;
+    connect(this, SIGNAL(downloadFinished()), & loop, SLOT(quit()));
+    downloadRequest(CustomNetworkRequest(QUrl(current_url.host()).resolved(url)));
+    loop.exec();
+    QDir().mkpath(QFileInfo(last_file_name).absolutePath());
+    return QDir(save_page->path()).relativeFilePath(last_file_name);
+}
+
 void WebPage::saveCurrentPage()
 {
     qDebug() << "save page";
@@ -759,16 +842,56 @@ void WebPage::saveCurrentPage()
     QMultiMap< QString, QList<QWebElement> > map;
     QList<QWebElement> list;
     int count = 0;
-    list = document.findAll("img").toList(); count += list.count();
-    map.insertMulti("src", list);
-    list = document.findAll("script").toList(); count += list.count();
-    map.insertMulti("src", list);
-    list = document.findAll("link").toList(); count += list.count();
-    map.insertMulti("href", list);
-    list = document.findAll("a").toList(); count += list.count();
-    map.insertMulti("href", list);
+    list = document.findAll("img").toList();
+    map.insertMulti("src", list); count += list.count();
+    list = document.findAll("script").toList();
+    map.insertMulti("src", list); count += list.count();
+    list = document.findAll("link").toList();
+    map.insertMulti("href", list); count += list.count();
+    list = document.findAll("a").toList();
+    map.insertMulti("href", list); count += list.count();
+    map.insertMulti("style", list); count += list.count();
+    list = document.findAll("div").toList();
+    map.insertMulti("style", list); count += list.count();
+    list = document.findAll("span").toList();
+    map.insertMulti("style", list); count += list.count();
     progress->setMaximum(count);
     progress->setWindowModality(Qt::NonModal);
+    /*
+    foreach (QWebElement el, document.findAll("style").toList())
+    {
+        if (progress->wasCanceled())
+        {
+            break;
+        }
+        QString css = el.toPlainText();
+        int end = 0;
+        while (end >= 0)
+        {
+            if (progress->wasCanceled())
+            {
+                break;
+            }
+            int start = end;
+            QString url = parseCssBgImageUrl(css, end);
+            if (!url.isEmpty())
+            {
+                QString res = savePageElement(QString(), QString(), url);
+                if (!res.isEmpty())
+                {
+                    res = "'" + res + "'";
+                    qDebug() << "css background-image" << url << res;
+                    start = css.indexOf("(", start) + 1;
+                    css = css.remove(start, end - start);
+                    css = css.insert(start, res);
+                    end += res.length() - (end - start);
+                }
+            }
+        }
+        qDebug() << css;
+        el.setPlainText(css);
+    }
+    */
     int k = 0;
     for (QMultiMap< QString, QList<QWebElement> >::iterator i = map.begin(); i != map.end(); ++i)
     {
@@ -780,37 +903,11 @@ void WebPage::saveCurrentPage()
         foreach (QWebElement el, i.value())
         {
             progress->setValue(k++);
-            QUrl url(el.attribute(url_attr));
-            if (url.isEmpty() ||
-                    (el.tagName().compare("img", Qt::CaseInsensitive) == 0 && url.toString().endsWith(".ico", Qt::CaseInsensitive)) ||
-                    (el.tagName().compare("a", Qt::CaseInsensitive) == 0 && url.toString() == "#"))
+            QString res = savePageElement(el.tagName(), url_attr, el.attribute(url_attr));
+            if (!res.isEmpty())
             {
-                continue;
+                el.setAttribute(url_attr, res);
             }
- //           qDebug() << url;
-            if (url.host().isEmpty())
-            {
-                url = QUrl("//" + current_url.host() + url.toString());
-            }
-//            qDebug() << url;
-            if (url.scheme().isEmpty())
-            {
-                url.setScheme(current_url.scheme());
-            }
-            if (el.tagName().compare("a", Qt::CaseInsensitive) == 0)
-            {
-                el.setAttribute(url_attr, url.toString());
-                continue;
-            }
-//            qDebug() << url;
-            QEventLoop loop;
-            connect(this, SIGNAL(downloadFinished()), & loop, SLOT(quit()));
-            downloadRequest(CustomNetworkRequest(QUrl(current_url.host()).resolved(url)));
-            loop.exec();
-            QDir().mkpath(QFileInfo(last_file_name).absolutePath());
-//            qDebug() << "saving" << url << last_file_name;
-//            el.setAttribute(url_attr, "file:///" + last_file_name);
-             el.setAttribute(url_attr, QDir(save_page->path()).relativeFilePath(last_file_name));
         }
     }
     save_page->switchRoot();

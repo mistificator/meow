@@ -87,6 +87,8 @@ private:
     void modifyExif(QString filename, QUrl file_url, QUrl page_url, QStringList tags);
     void runUserScriptRecursive(QWebFrame *);
     void updateCompleter(QString, QString);
+    QString parseCssBgImageUrl(const QString & css, int & pos);
+    QString savePageElement(QString tag, QString attr, QString value);
 protected:
     void showEvent(QShowEvent *);
 signals:
