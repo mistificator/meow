@@ -48,7 +48,11 @@ var url_filters =
 	"advert",
 	"adfox",
 	"bingads.com",
-	"adnxs.com"
+	"adnxs.com",
+	"reklama",
+	"!ad.",
+	"tns-counter.",
+	"radar.imgsmail.ru"
 ];
 
 var keyword_filters =
@@ -75,7 +79,10 @@ var keyword_filters =
 	"rcjsload",
 	"aswift",
 	"widead",
-	"adcont"
+	"adcont",
+	"mailru",
+	"counter",
+	"reklama"
 ];
 
 var style_exception_filters =
@@ -110,12 +117,24 @@ function checkHosts(url_filters)
 
 function checkUrlInSrc(ad, url_filter)
 {
-	return checkHost(url_filter) && ad.src.toLowerCase().indexOf(url_filters[j]) > -1;
+	var starts_with = false;
+	if (url_filter.charAt(0) == '!')
+	{
+		url_filter = url_filter.substr(1);
+		starts_with = true;
+	}
+	return checkHost(url_filter) && ((starts_with && ad.src.toLowerCase().indexOf(url_filters[j]) == 0) || (!starts_with && ad.src.toLowerCase().indexOf(url_filters[j]) > -1));
 }
 
 function checkUrlInSrcName(ad, url_filter)
 {
-	return checkHost(url_filter) && (checkUrlInSrc(ad, url_filter) || ad.name.toLowerCase().indexOf(url_filter) > -1);
+	var starts_with = false;
+	if (url_filter.charAt(0) == '!')
+	{
+		url_filter = url_filter.substr(1);
+		starts_with = true;
+	}
+	return checkHost(url_filter) && (checkUrlInSrc(ad, url_filter) || ((starts_with && ad.name.toLowerCase().indexOf(url_filter) == 0) || (starts_with && ad.name.toLowerCase().indexOf(url_filter) > -1)));
 }
 
 function checkKeywordInIdClass(ad, keyword_filter)
@@ -132,7 +151,7 @@ function checkKeywordInIdClass(ad, keyword_filter)
 
 function checkKeywordInText(ad, keyword_filter)
 {
-	return ad.textContent.toLowerCase().indexOf(keyword_filter);
+	return ad.textContent.toLowerCase().indexOf(keyword_filter) > -1;
 }
 
 function checkUrlInText(ad, url_filter)
