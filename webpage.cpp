@@ -605,7 +605,8 @@ void WebPage::saveReplyToDisk(const QUrl & url, const QByteArray & data, QString
         }
     }
 
-    QFile file(last_file_name = path + filename);
+    last_file_name = QString(path + filename).replace(QRegExp("[\\/]+"), "/");
+    QFile file(last_file_name);
     if (!data.isEmpty() && file.open(QFile::WriteOnly))
     {
         file.write(data);
@@ -733,7 +734,7 @@ void WebPage::downloadRequest(const QNetworkRequest & request)
 
 QString WebPage::parseCssBgImageUrl(const QString & css, int & start, int & end)
 {
-    QRegExp re("url\\s*\\(\\s*[\\/:\"'&?=.\\+\\-%\\w]*\\s*\\)");
+    QRegExp re("url\\s*\\(\\s*[\\/:\"'&?=\\.\\+\\-%\\w]*\\s*\\)");
     start = re.indexIn(css, start);
     if (start < 0)
     {
@@ -741,7 +742,7 @@ QString WebPage::parseCssBgImageUrl(const QString & css, int & start, int & end)
         return QString();
     }
     end = start + re.matchedLength();
-    return css.mid(start, end - start - 1).replace("url\\s*\\(\\s*[\"']*", "").replace("\\s*\\[\"']*\\)", "");
+    return css.mid(start, end - start).replace(QRegExp("url\\s*\\(\\s*[\"']*"), "").replace(QRegExp("\\s*[\"']*\\s*\\)"), "");
 }
 
 QString WebPage::savePageElement(QString tag, QString attr, QString value)
@@ -778,7 +779,8 @@ QString WebPage::savePageElement(QString tag, QString attr, QString value)
     qDebug() << tag << attr << value << url;
     QEventLoop loop;
     connect(this, SIGNAL(downloadFinished()), & loop, SLOT(quit()));
-    downloadRequest(CustomNetworkRequest(QUrl(current_url.host()).resolved(url)));
+//    downloadRequest(CustomNetworkRequest(QUrl(current_url.host()).resolved(url)));
+    downloadRequest(CustomNetworkRequest(url));
     loop.exec();
     QDir().mkpath(QFileInfo(last_file_name).absolutePath());
     return QDir(save_page->path()).relativeFilePath(last_file_name);
@@ -806,7 +808,7 @@ void WebPage::saveCurrentPage()
     QProgressDialog * progress = new QProgressDialog(view());
     progress->setWindowTitle("Saving page");
     progress->setWindowFlags(Qt::CustomizeWindowHint | Qt::Tool | Qt::WindowCloseButtonHint);
-    progress->setMinimumDuration(2000);
+    progress->setMinimumDuration(500);
     view()->stop();
     QDir().mkpath(save_page->path());
     QWebElement document = page()->mainFrame()->documentElement();
@@ -826,7 +828,7 @@ void WebPage::saveCurrentPage()
     map.insertMulti("style", list); count += list.count();
     list = document.findAll("span").toList();
     map.insertMulti("style", list); count += list.count();
-    progress->setMaximum(count);
+    progress->setMaximum(0);
     progress->setWindowModality(Qt::NonModal);
 
     foreach (QWebElement el, document.findAll("style").toList())
@@ -851,15 +853,15 @@ void WebPage::saveCurrentPage()
                 if (!res.isEmpty())
                 {
                     css = css.remove(start, end - start).insert(start, "url('" + res + "')");
-                    end += (7 + res.length()) - (end - start);
+                    end += (5 + res.length() + 2) - (end - start);
                 }
             }
         }
 
-//        css = css.replace("//", current_url.scheme() + "://");
-
         el.setPlainText(css);
     }
+
+    progress->setMaximum(count);
 
     int k = 0;
     for (QMultiMap< QString, QList<QWebElement> >::iterator i = map.begin(); i != map.end(); ++i)

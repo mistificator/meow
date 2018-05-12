@@ -81,7 +81,7 @@ var keyword_filters =
 	"widead",
 	"adcont",
 	"mailru",
-	"counter",
+//	"counter",
 	"reklama"
 ];
 
@@ -247,6 +247,13 @@ function blockAd_div(ad)
         ads_count++;
 		return;		
 	}		
+	if (ad.hasAttribute("data-google-query-id"))
+	{
+        console.log("BanHammer: div data-google-query-id found");
+        ad.remove();
+        ads_count++;
+		return;			
+	}
 }
 
 function blockAd_script(ad)
