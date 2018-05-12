@@ -100,7 +100,7 @@ var total_blocking_time = 0;
 
 function checkHost(url_filter)
 {
-	return !window.location.hostname || window.location.hostname.toLowerCase().indexOf(url_filter) == -1;
+	return !window.location.hostname && !window.location.hostname == "" && window.location.hostname.toLowerCase().indexOf(url_filter) == -1;
 }
 
 function checkHosts(url_filters)

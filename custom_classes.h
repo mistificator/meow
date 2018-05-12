@@ -193,6 +193,8 @@ public:
             }
             delete refCount(privacy);
             delete sharedJar(privacy);
+            refCount(privacy) = 0;
+            sharedJar(privacy) = 0;
         }
     }
     virtual QList<QNetworkCookie> cookiesForUrl(const QUrl &url) const
