@@ -76,7 +76,7 @@ WebPage::WebPage(Privacy _privacy, QWidget *parent) :
 {
     ui->setupUi(this);
 
-    view()->setPage(new UserAgentWebPage());    
+    view()->setPage(new CustomWebPage());
     page()->setLinkDelegationPolicy(QWebPage::DelegateAllLinks);
     page()->setForwardUnsupportedContent(true);
 
@@ -178,6 +178,8 @@ QWebPage * WebPage::page() const
 
 void WebPage::load(const QUrl & url)
 {
+    qApp->sendPostedEvents(); // hack
+    qApp->processEvents(); // hack
     view()->load(CustomNetworkRequest(url));
 }
 
@@ -359,6 +361,10 @@ void WebPage::runScript()
 void WebPage::customContextMenuRequested(const QPoint & pos)
 {
     QMenu * menu = page()->createStandardContextMenu();
+    if (menu->actions().contains(view()->pageAction(QWebPage::OpenImageInNewWindow)))
+    {
+        menu->insertAction(view()->pageAction(QWebPage::OpenImageInNewWindow), ui->actionSearchImage);
+    }
     menu->exec(mapToGlobal(current_pos = pos));
     menu->deleteLater();
 }
@@ -408,24 +414,10 @@ void WebPage::actionOpenLinkInNewWindow()
 void WebPage::actionOpenFrameInNewWindow()
 {
     QWebFrame * frame = hitTest(current_pos).frame();
-    QString html = frame->documentElement().toOuterXml();
-    if (!html.isEmpty())
+    if (!frame->requestedUrl().isEmpty() && frame->requestedUrl().isValid())
     {
-        WebPage * frame_page = new WebPage(privacy, topLevelWidget());
-        frame_page->setWindowFlags(Qt::CustomizeWindowHint | Qt::Tool | Qt::WindowCloseButtonHint | Qt::WindowTitleHint);
-        frame_page->setWindowTitle(current_page_title);
-        frame_page->view()->setHtml(html, frame->url());
-        for (int i = 0; i < frame_page->ui->horizontalLayout->count(); i++)
-        {
-            QLayoutItem * item = frame_page->ui->horizontalLayout->itemAt(i);
-            if (item->widget())
-            {
-                item->widget()->hide();
-            }
-        }
-        ui->progressBar->hide();
-        frame_page->show();
-        frame_page->activateWindow();
+        createToolWindow(frame->requestedUrl());
+//        emit newWindowLink(frame->requestedUrl());
     }
 }
 
@@ -720,7 +712,7 @@ void WebPage::runUserScriptRecursive(QWebFrame * frame)
     }
 }
 
-void WebPage::frameCreated(QWebFrame *)
+void WebPage::frameCreated(QWebFrame * frame)
 {
 }
 
@@ -920,6 +912,26 @@ bool WebPage::isIncognito() const
     return privacy == IncognitoPrivacy;
 }
 
+WebPage * WebPage::createToolWindow(QUrl url, QString title, Qt::ConnectionType conn) const
+{
+    WebPage * new_webpage = new WebPage(privacy, topLevelWidget());
+    new_webpage->setWindowTitle(title);
+    new_webpage->setWindowFlags(Qt::CustomizeWindowHint | Qt::Tool | Qt::WindowCloseButtonHint | Qt::WindowTitleHint);
+    for (int i = 0; i < new_webpage->ui->horizontalLayout->count(); i++)
+    {
+        QLayoutItem * item = new_webpage->ui->horizontalLayout->itemAt(i);
+        if (item->widget())
+        {
+            item->widget()->hide();
+        }
+    }
+    new_webpage->ui->progressBar->hide();
+    new_webpage->show();
+    new_webpage->activateWindow();
+    QMetaObject::invokeMethod(new_webpage, "load", conn, Q_ARG(QUrl, url));
+    return new_webpage;
+}
+
 void WebPage::updownProgress(qint64 processed, qint64 total)
 {
     qDebug() << "updown" << processed << "/" << total;
@@ -934,3 +946,25 @@ void WebPage::inspectCurrentElement()
     ui->dockWidget->show();
 }
 
+
+void WebPage::on_actionSearchImage_triggered()
+{
+    QUrl url = hitTest(current_pos).imageUrl();
+    if (!url.isEmpty() && url.isValid())
+    {
+        QString image_search_url = SettingsPage::currentImageSearchEngineUrl();
+        if (!image_search_url.isEmpty())
+        {
+            if (image_search_url.contains("%1"))
+            {
+                image_search_url = image_search_url.arg(url.toString());
+            }
+            else
+            {
+                image_search_url += url.toString();
+            }
+            qDebug() << "search image url" << image_search_url;
+            emit newWindowLink(QUrl(image_search_url));
+        }
+    }
+}

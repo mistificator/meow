@@ -11,14 +11,80 @@
 #include <QNetworkCookie>
 #include <QFile>
 #include <QDebug>
+#include <QtWebKitWidgets/QWebFrame>
+#include <QtWebKit/QWebElement>
+#include <QApplication>
 
 #include "settingspage.h"
+#include "webpage.h"
 
-class UserAgentWebPage : public QWebPage
+class CustomWebPage : public QWebPage
 {
 public:
-    UserAgentWebPage(QObject * _parent = 0): QWebPage(_parent) {}
-protected:
+    CustomWebPage(QObject * _parent = 0): QWebPage(_parent) {}
+protected:    
+    virtual bool acceptNavigationRequest(QWebFrame * frame, const QNetworkRequest & request, NavigationType type)
+    {
+        bool rc = QWebPage::acceptNavigationRequest(frame, request, type);
+//        qDebug() << "accept nav request" << this << view() << rc << request.url() << type;
+        if (view() == 0 && property("view").toULongLong() != 0 && type == QWebPage::NavigationTypeOther)
+        {
+            if (WebPage * webpage = dynamic_cast<WebPage *>(((QWebView *)property("view").toULongLong())->parentWidget()))
+            {
+                setProperty("view", 0);
+
+                webpage->createToolWindow(request.url(), property("text").toString(), Qt::QueuedConnection);
+                //QMetaObject::invokeMethod(webpage, "newWindowLink", Qt::QueuedConnection, Q_ARG(QUrl, request.url())); // opens in a new tab
+
+                QMetaObject::invokeMethod(this, "deleteLater", Qt::QueuedConnection);
+            }
+
+        }
+        return rc;
+    }
+    virtual QObject * createPlugin(const QString & classid, const QUrl & url, const QStringList & paramNames, const QStringList & paramValues)
+    {
+        qDebug() << "create plugin" << classid << url;
+        return QWebPage::createPlugin(classid, url, paramNames, paramValues);
+    }
+    virtual QWebPage * createWindow(WebWindowType type)
+    {
+        QWebPage * page = QWebPage::createWindow(type);
+
+        if (page == 0 && view())
+        {
+            QWebHitTestResult hit = currentFrame()->hitTestContent(view()->mapFromGlobal(QCursor::pos()));
+            if (hit.linkUrl().isEmpty())
+            {
+                qDebug() << "hit test" << hit.element().tagName();
+                page = new CustomWebPage(this);
+                page->setProperty("view", (qulonglong)view());
+                page->setProperty("text", hit.element().toPlainText());
+                qDebug() << "create window" << type << page;
+            }
+        }
+
+        return page;
+    }
+    virtual void javaScriptAlert(QWebFrame * frame, const QString & msg)
+    {
+        qDebug() << "alert" << msg;
+        return QWebPage::javaScriptAlert(frame, msg);
+    }
+    virtual bool javaScriptConfirm(QWebFrame * frame, const QString & msg)
+    {
+        qDebug() << "confirm" << msg;
+        return QWebPage::javaScriptConfirm(frame, msg);
+    }
+    virtual void javaScriptConsoleMessage(const QString & message, int lineNumber, const QString & sourceID)
+    {
+        QWebPage::javaScriptConsoleMessage(message, lineNumber, sourceID);
+    }
+    virtual bool javaScriptPrompt(QWebFrame * frame, const QString & msg, const QString & defaultValue, QString * result)
+    {
+        qDebug() << "prompt" << msg;
+        return QWebPage::javaScriptPrompt(frame, msg, defaultValue, result);
+    }
     virtual QString userAgentForUrl(const QUrl &) const
     {
         QString str = SettingsPage::useragentString();

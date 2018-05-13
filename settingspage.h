@@ -46,6 +46,12 @@ public:
     static int currentSearchEngine();
     static QString currentSearchEngineUrl();
 
+    static bool setImageSearchEngines(QStringList);
+    static QStringList imageSearchEngines();
+    static bool setCurrentImageSearchEngine(int);
+    static int currentImageSearchEngine();
+    static QString currentImageSearchEngineUrl();
+
     enum SavePolicy {SaveAsk = 0, SaveSilent = 1};
     static bool setSavePolicy(SavePolicy);
     static SavePolicy savePolicy();
@@ -93,8 +99,9 @@ private slots:
     void on_proxySystem_toggled(bool checked);
     void on_proxyEnabled_toggled(bool checked);
     void on_searchEngine_currentIndexChanged(int index);
-    void on_searchEngine_editTextChanged(const QString &arg1);
     void on_searchRemove_clicked();
+    void on_imageSearchEngine_currentIndexChanged(int index);
+    void on_imageSearchRemove_clicked();
     void on_saveAsk_toggled(bool checked);
     void on_saveSilent_toggled(bool checked);
     void on_savePath_editingFinished();
@@ -110,6 +117,7 @@ private slots:
 private:
     Ui::SettingsPage *ui;
     QStringList updateSearchEngines();
+    QStringList updateImageSearchEngines();
     void updateScriptsLoaded();
     static QString user_script;
     static int loaded_scripts_count;

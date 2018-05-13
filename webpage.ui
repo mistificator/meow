@@ -143,6 +143,14 @@
     <string>Forward</string>
    </property>
   </action>
+  <action name="actionSearchImage">
+   <property name="text">
+    <string>Search Image</string>
+   </property>
+   <property name="toolTip">
+    <string>Search image</string>
+   </property>
+  </action>
  </widget>
  <customwidgets>
   <customwidget>

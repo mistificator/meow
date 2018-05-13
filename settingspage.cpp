@@ -46,6 +46,11 @@ SettingsPage::SettingsPage(QWidget *parent) :
     ui->searchEngine->setCurrentIndex(engine_index);
     ui->searchRemove->setIcon(style()->standardIcon(QStyle::SP_LineEditClearButton));
 
+    const int image_engine_index = currentImageSearchEngine();
+    ui->imageSearchEngine->addItems(imageSearchEngines());
+    ui->imageSearchEngine->setCurrentIndex(image_engine_index);
+    ui->imageSearchRemove->setIcon(style()->standardIcon(QStyle::SP_LineEditClearButton));
+
     SavePolicy save_policy = savePolicy();
     ui->saveAsk->setChecked(save_policy == SaveAsk);
     ui->saveSilent->setChecked(save_policy == SaveSilent);
@@ -107,7 +112,16 @@ QString SettingsPage::userScriptsDir()
 class JSCheckWebPage: public QWebPage
 {
 public:
-    JSCheckWebPage(QObject * _parent = 0): QWebPage(_parent) {}
+    JSCheckWebPage(QObject * _parent = 0): QWebPage(_parent)
+    {
+        clearMessage();
+    }
+    void clearMessage()
+    {
+        message.clear();
+        source.clear();
+        line = -1;
+    }
 protected:
     virtual void javaScriptConsoleMessage(const QString& _message, int _lineNumber, const QString& _sourceID)
     {
@@ -128,6 +142,7 @@ void SettingsPage::loadScripts()
     loaded_scripts_count = 0;
     foreach (QString filename, QDir(userScriptsDir()).entryList(QStringList() << "*.js", QDir::Files))
     {
+        page.clearMessage();
         page.mainFrame()->setHtml("<html><head></head><body></body></html>");
         QFile js_file(userScriptsDir() + "/" + filename);
         if (js_file.open(QFile::ReadOnly))
@@ -192,6 +207,9 @@ void SettingsPage::databaseSettingsInit(QSqlDatabase & db)
                      "duckduckgo.com/?q=%1" <<
                      "google.com/search?q=%1" <<
                      "yandex.com/search/?text=%1");
+    setImageSearchEngines(QStringList() <<
+                     "google.com/searchbyimage?image_url=%1" <<
+                     "yandex.com/images/search?rpt=imageview&url=%1");
 
     QString download_location;
 #if QT_VERSION >= 0x050000
@@ -383,6 +401,46 @@ QString SettingsPage::currentSearchEngineUrl()
     return url;
 }
 
+bool SettingsPage::setImageSearchEngines(QStringList list)
+{
+    return setValue("ImageSearchEngines", list.join("\n"));
+}
+
+QStringList SettingsPage::imageSearchEngines()
+{
+    return value("ImageSearchEngines").split("\n");
+}
+
+bool SettingsPage::setCurrentImageSearchEngine(int index)
+{
+    return setValue("ImageSearchEngineCurrent", QString::number(index));
+}
+
+int SettingsPage::currentImageSearchEngine()
+{
+    const int index = value("ImageSearchEngineCurrent").toInt();
+    if (index < 0 || index >= imageSearchEngines().count())
+    {
+        return -1;
+    }
+    return index;
+}
+
+QString SettingsPage::currentImageSearchEngineUrl()
+{
+    const int index = value("ImageSearchEngineCurrent").toInt();
+    const QStringList engines = imageSearchEngines();
+    if (index < 0 || index >= engines.count())
+    {
+        return QString();
+    }
+    QString url(engines.at(index));
+    if (QUrl(url).scheme().isEmpty())
+    {
+        url = "https://" + url;
+    }
+    return url;
+}
 
 bool SettingsPage::setSavePolicy(SavePolicy policy)
 {
@@ -601,7 +659,19 @@ QStringList SettingsPage::updateSearchEngines()
     for (int i = 0; i < ui->searchEngine->count(); i++)
     {
         QString url =  ui->searchEngine->itemText(i);
-//        ui->searchEngine->setItemIcon(i, QWebSettings::iconForUrl(QUrl(url).adjusted(QUrl::RemovePath))); // doesn't work
+        ui->searchEngine->setItemIcon(i, QWebSettings::iconForUrl(QUrl("https://" + QUrl(url).host()))); // doesn't work
+        list << url;
+    }
+    return list;
+}
+
+QStringList SettingsPage::updateImageSearchEngines()
+{
+    QStringList list;
+    for (int i = 0; i < ui->imageSearchEngine->count(); i++)
+    {
+        QString url =  ui->imageSearchEngine->itemText(i);
+        ui->searchEngine->setItemIcon(i, QWebSettings::iconForUrl(QUrl("https://" + QUrl(url).host()))); // doesn't work
         list << url;
     }
     return list;
@@ -613,15 +683,24 @@ void SettingsPage::on_searchEngine_currentIndexChanged(int index)
     setCurrentSearchEngine(index);
 }
 
-void SettingsPage::on_searchEngine_editTextChanged(const QString &)
-{
-}
-
 void SettingsPage::on_searchRemove_clicked()
 {
     ui->searchEngine->removeItem(ui->searchEngine->currentIndex());
     setSearchEngines(updateSearchEngines());
     setCurrentSearchEngine(ui->searchEngine->currentIndex());
+}
+
+void SettingsPage::on_imageSearchEngine_currentIndexChanged(int index)
+{
+    setImageSearchEngines(updateImageSearchEngines());
+    setCurrentImageSearchEngine(index);
+}
+
+void SettingsPage::on_imageSearchRemove_clicked()
+{
+    ui->imageSearchEngine->removeItem(ui->imageSearchEngine->currentIndex());
+    setImageSearchEngines(updateImageSearchEngines());
+    setCurrentImageSearchEngine(ui->imageSearchEngine->currentIndex());
 }
 
 void SettingsPage::on_saveAsk_toggled(bool checked)
@@ -713,3 +792,4 @@ void SettingsPage::on_clearHistory_clicked()
 {
     clearCompleterHistory();
 }
+

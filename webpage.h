@@ -28,12 +28,13 @@ public:
     QWebView * view() const;
     QWebPage * page() const;
     bool isIncognito() const;
-    void load(const QUrl & url);
+    WebPage * createToolWindow(QUrl url, QString title = "", Qt::ConnectionType conn = Qt::QueuedConnection) const;
 public slots:
     void downloadRequest(const QNetworkRequest & request);
     void saveCurrentPage();
     void runScript();
     void inspectCurrentElement();
+    void load(const QUrl & url);
 private slots:
     void on_actionLoadPage_triggered();
     void on_actionReloadPage_triggered();
@@ -62,6 +63,8 @@ private slots:
     void frameCreated(QWebFrame * frame);
 
     void updownProgress(qint64 processed, qint64 total);
+    void on_actionSearchImage_triggered();
+
 private:
     Ui::WebPage *ui;
     QUrl current_url;

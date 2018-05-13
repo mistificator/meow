@@ -23,7 +23,16 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     proxyChanged(SettingsPage::proxyType());
 
+//    QWebSecurityOrigin::addLocalScheme("https");
+//    QWebSecurityOrigin::addLocalScheme("http");
+
     QWebSettings::globalSettings()->setAttribute(QWebSettings::DeveloperExtrasEnabled, true);
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::JavascriptCanOpenWindows, true);
+    QWebSettings::globalSettings()->setAttribute(QWebSettings::JavascriptCanCloseWindows, true);
+//    QWebSettings::globalSettings()->setAttribute(QWebSettings::WebSecurityEnabled, false);
+//    QWebSettings::globalSettings()->setAttribute(QWebSettings::AllowRunningInsecureContent, false);
+//    QWebSettings::globalSettings()->setAttribute(QWebSettings::LocalContentCanAccessRemoteUrls, true);
+//    QWebSettings::globalSettings()->setAttribute(QWebSettings::LocalContentCanAccessFileUrls, true);
 //    QWebSettings::globalSettings()->setAttribute(QWebSettings::DnsPrefetchEnabled, true);
 
     QSslConfiguration conf = QSslConfiguration::defaultConfiguration();
