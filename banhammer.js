@@ -52,14 +52,18 @@ var url_filters =
 	"reklama",
 	"!ad.",
 	"tns-counter.",
-	"radar.imgsmail.ru"
+	"radar.imgsmail.ru",
+	"adnium.com",
+	"traffichaus.com",
+	"click.",
+	"clicks.",
+	"refer."
 ];
 
 var keyword_filters =
 [
 	"advert",
 	"bn_",
-	"!ad_",
 	"_adtune",
 	"yap-",
 	"yandex_rtb",
@@ -67,7 +71,15 @@ var keyword_filters =
 	"-ads-",
 	"-ad-",
 	"adfox",
+	"!ad_",
+	"!ads_",
+	"!ad-",
+	"!ads-",
 	"_ads_",
+	"_ads!",
+	"_ad!",
+	"-ads!",
+	"-ad!",
 	"adsbygoogle",
 	"advert",
 	"ban_",
@@ -82,7 +94,8 @@ var keyword_filters =
 	"adcont",
 	"mailru",
 //	"counter",
-	"reklama"
+	"reklama",
+	"adhiding"
 ];
 
 var style_exception_filters =
@@ -98,9 +111,24 @@ var ads_count = 0;
 var total_ads_count = 0;
 var total_blocking_time = 0;
 
+function checkContains(ad, filter)
+{
+	if (filter.charAt(0) == '!')
+	{
+		filter = filter.substr(1);
+		return ad.toLowerCase().indexOf(filter) == 0 || ad.toLowerCase().indexOf(" " + filter) > -1;
+	}	
+	if (filter.charAt(filter.length - 1) == '!')
+	{
+		filter = filter.substr(0, filter.length - 1);
+		return ad.length >= filter.length && (ad.toLowerCase().indexOf(filter) == (ad.length - filter.length) || ad.toLowerCase().indexOf(filter + " ") > -1);
+	}
+	return ad.toLowerCase().indexOf(filter) > -1;
+}
+
 function checkHost(url_filter)
 {
-	return !window.location.hostname && !window.location.hostname == "" && window.location.hostname.toLowerCase().indexOf(url_filter) == -1;
+	return !window.location.hostname && !window.location.hostname == "" && !checkContains(window.location.hostname, url_filter);
 }
 
 function checkHosts(url_filters)
@@ -117,41 +145,22 @@ function checkHosts(url_filters)
 
 function checkUrlInSrc(ad, url_filter)
 {
-	var starts_with = false;
-	if (url_filter.charAt(0) == '!')
-	{
-		url_filter = url_filter.substr(1);
-		starts_with = true;
-	}
-	return checkHost(url_filter) && ((starts_with && ad.src.toLowerCase().indexOf(url_filters[j]) == 0) || (!starts_with && ad.src.toLowerCase().indexOf(url_filters[j]) > -1));
+	return checkHost(url_filter) && checkContains(ad.src, url_filter);
 }
 
 function checkUrlInSrcName(ad, url_filter)
 {
-	var starts_with = false;
-	if (url_filter.charAt(0) == '!')
-	{
-		url_filter = url_filter.substr(1);
-		starts_with = true;
-	}
-	return checkHost(url_filter) && (checkUrlInSrc(ad, url_filter) || ((starts_with && ad.name.toLowerCase().indexOf(url_filter) == 0) || (starts_with && ad.name.toLowerCase().indexOf(url_filter) > -1)));
+	return checkContains(ad.src, url_filter) || checkContains(ad.name, url_filter);
 }
 
 function checkKeywordInIdClass(ad, keyword_filter)
 {
-	var starts_with = false;
-	if (keyword_filter.charAt(0) == '!')
-	{
-		keyword_filter = keyword_filter.substr(1);
-		starts_with = true;
-	}
-	return ((starts_with && (ad.id.toLowerCase().indexOf(keyword_filter) == 0 || ad.className.toLowerCase().indexOf(keyword_filter) == 0)) ||
-		(!starts_with && (ad.id.toLowerCase().indexOf(keyword_filter) > -1 || ad.className.toLowerCase().indexOf(keyword_filter) > -1)));
+	return checkContains(ad.id, keyword_filter) || checkContains(ad.className, keyword_filter);
 }
 
 function checkKeywordInText(ad, keyword_filter)
 {
-	return ad.textContent.toLowerCase().indexOf(keyword_filter) > -1;
+	return checkContains(ad.textContent, keyword_filter);
 }
 
 function checkUrlInText(ad, url_filter)
@@ -163,7 +172,7 @@ function blockAd_a(ad)
 {
     for (j = 0; j < url_filters.length; j++)
     {
-        if (ad.href.toLowerCase().indexOf(url_filters[j]) > -1)
+        if (checkContains(ad.href, url_filters[j]))
         {
             console.log("BanHammer: a " + ad.href + " filter " + url_filters[j]);
             ad.remove();
