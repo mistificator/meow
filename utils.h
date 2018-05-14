@@ -5,6 +5,7 @@
 #include <QTextStream>
 #include <QDebug>
 #include <QRegExp>
+#include <QApplication>
 
 namespace Meow
 {
@@ -26,6 +27,11 @@ namespace Meow
     static QString excludeUndesiredSymbols(QString source, QString replacer = QString(), QRegExp undesired_symbols = undesiredSymbols())
     {
         return source.replace(undesired_symbols, replacer);
+    }
+    static void waitEventsProcessing()
+    {
+        qApp->sendPostedEvents();
+        qApp->processEvents();
     }
 }
 

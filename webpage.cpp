@@ -10,7 +10,6 @@
 #include <QDebug>
 #include <QNetworkProxy>
 #include <QtWebKit/QWebElement>
-#include <QFileDialog>
 #include <QImageReader>
 #include <QBuffer>
 #include <QTableView>
@@ -63,6 +62,11 @@ WebPage::WebPage(Privacy _privacy, QWidget *parent) :
     connect(view()->pageAction(QWebPage::DownloadLinkToDisk), SIGNAL(triggered()), this, SLOT(actionDownloadLinkToDisk()));
     connect(view()->pageAction(QWebPage::DownloadImageToDisk), SIGNAL(triggered()), this, SLOT(actionDownloadImageToDisk()));
     connect(view()->pageAction(QWebPage::InspectElement), SIGNAL(triggered()), this, SLOT(inspectCurrentElement()));
+
+    ui->actionSearchImage->setIcon(style()->standardIcon(QStyle::SP_FileDialogContentsView));
+    view()->pageAction(QWebPage::DownloadLinkToDisk)->setIcon(style()->standardIcon(QStyle::SP_DriveFDIcon));
+    view()->pageAction(QWebPage::DownloadImageToDisk)->setIcon(style()->standardIcon(QStyle::SP_DriveFDIcon));
+    view()->pageAction(QWebPage::InspectElement)->setIcon(style()->standardIcon(QStyle::SP_FileDialogInfoView));
 
     ui->actionLoadPage->setIcon(style()->standardIcon(QStyle::SP_CommandLink));
     ui->actionReloadPage->setIcon(style()->standardIcon(QStyle::SP_BrowserReload));
@@ -146,8 +150,7 @@ QWebPage * WebPage::page() const
 
 void WebPage::load(const QUrl & url)
 {
-    qApp->sendPostedEvents(); // hack
-    qApp->processEvents(); // hack
+    Meow::waitEventsProcessing(); // hack
     view()->load(CustomNetworkRequest(url));
 }
 

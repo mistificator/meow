@@ -16,6 +16,7 @@
 #endif
 
 #include "custom_classes.h"
+#include "utils.h"
 
 int SettingsPage::loaded_scripts_count = 0;
 QString SettingsPage::user_script;
