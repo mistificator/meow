@@ -87,6 +87,8 @@ public:
 
     static QSqlDatabase databaseHistory();
 
+    static QString cookieJar();
+    static bool clearCookies();
 signals:
     void proxyChanged(SettingsPage::ProxyType);
     void privacyChanged(SettingsPage::Privacy);

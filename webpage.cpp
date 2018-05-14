@@ -72,13 +72,13 @@ WebPage::WebPage(Privacy _privacy, QWidget *parent) :
     ui(new Ui::WebPage),
     privacy(_privacy),
     script("// sample script\r\ndocument.title = \"This is the new page title.\";"),
-    save_page(new SavePageStruct())
+    save_page(new SavePageStruct()),
+    tool_window(false),
+    temporary(false)
 {
     ui->setupUi(this);
 
     view()->setPage(new CustomWebPage());
-    page()->setLinkDelegationPolicy(QWebPage::DelegateAllLinks);
-    page()->setForwardUnsupportedContent(true);
 
     connect(page(), SIGNAL(linkClicked(QUrl)), this, SLOT(linkClicked(QUrl)));
     connect(page(), SIGNAL(linkHovered(QString,QString,QString)), this, SIGNAL(linkHovered(QString,QString,QString)));
@@ -94,9 +94,6 @@ WebPage::WebPage(Privacy _privacy, QWidget *parent) :
     ui->dockWidget->hide();
 
     connect(this, SIGNAL(showNotifier(QString, int)), dynamic_cast<MainWindow *>(topLevelWidget()), SLOT(showNotifier(QString, int)));
-
-    manager = new QNetworkAccessManager(this);    
-    connect(manager, SIGNAL(finished(QNetworkReply *)), this, SLOT(replyFinished(QNetworkReply *)));
 
     connect(view(), SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(customContextMenuRequested(QPoint)));
     connect(view()->pageAction(QWebPage::OpenLink), SIGNAL(triggered()), this, SLOT(actionOpenLink()));
@@ -155,12 +152,21 @@ WebPage::WebPage(Privacy _privacy, QWidget *parent) :
         setWindowIcon(style()->standardIcon(QStyle::SP_DesktopIcon));
     }
 
-    page()->networkAccessManager()->setCookieJar(new SharedCookieJar((SettingsPage::Privacy)privacy));
+    manager = new DownloadManager();
+    connect(manager, SIGNAL(downloadProgress(qint64,qint64)), this, SLOT(updownProgress(qint64,qint64)));
+    connect(manager, SIGNAL(downloadProgress(qint64,qint64)), this, SIGNAL(downloadProgress(qint64,qint64)));
+    connect(manager, SIGNAL(downloadFinished(QNetworkReply *)), this, SLOT(downloadFinished(QNetworkReply *)));
     manager->setCookieJar(new SharedCookieJar((SettingsPage::Privacy)privacy));
+
+    page()->networkAccessManager()->setCookieJar(new SharedCookieJar((SettingsPage::Privacy)privacy));
 }
 
 WebPage::~WebPage()
 {
+    if (manager->currentReply() && manager->currentReply()->isRunning())
+    {
+        connect(manager, SIGNAL(downloadFinished(QNetworkReply*)), manager, SLOT(deleteLater()), Qt::QueuedConnection);
+    }
     page()->networkAccessManager()->setCookieJar(new QNetworkCookieJar()); // force prev jar dtor calling
     delete ui;
     delete save_page;
@@ -248,33 +254,38 @@ void WebPage::on_actionForward_triggered()
     }
 }
 
+void WebPage::drawMeowCat()
+{
+    if (current_url.toString().trimmed().compare("about:blank", Qt::CaseInsensitive) == 0) // draw cat
+    {
+        QStringList div_style = QStringList() << "position: absolute" << "top: 0" << "bottom: 0" << "left: 0" << "right: 0" << "margin: auto" << "width: 30%" << "height: 30%";
+        if (!isIncognito())
+        {
+            div_style << "opacity: 0.1";
+        }
+        page()->mainFrame()->setHtml(
+                    "<html><body><figure><div id=\"meow_cat\" style=\"" +
+                    div_style.join("; ") + "\">" +
+                    Meow::resourceString(":/Images/robocat.svg") +
+                    "</div></figure><script type=\"text/javascript\">var meow_cat=document.getElementById(\"meow_cat\");</script></body></html>");
+    }
+}
+
 void WebPage::on_webView_loadFinished(bool status)
 {
     if (status)
     {
-        if (property("temporary").toBool())
+        if (temporary)
         {
-            if (property("requested_url").toUrl() != view()->url())
+            if (requested_url != view()->url())
             {
                 downloadRequest(CustomNetworkRequest(view()->url()));
             }
         }
         else
         {
+            drawMeowCat();
             runUserScriptRecursive(page()->mainFrame());
-            if (current_url.toString().trimmed().compare("about:blank", Qt::CaseInsensitive) == 0) // draw cat
-            {
-                QStringList div_style = QStringList() << "position: absolute" << "top: 0" << "bottom: 0" << "left: 0" << "right: 0" << "margin: auto" << "width: 30%" << "height: 30%";
-                if (!isIncognito())
-                {
-                    div_style << "opacity: 0.1";
-                }
-                page()->mainFrame()->setHtml(
-                            "<html><body><figure><div id=\"meow_cat\" style=\"" +
-                            div_style.join("; ") + "\">" +
-                            Meow::resourceString(":/Images/robocat.svg") +
-                            "</div></figure><script type=\"text/javascript\">var meow_cat=document.getElementById(\"meow_cat\");</script></body></html>");
-            }
         }
     }
     else
@@ -517,14 +528,17 @@ void WebPage::modifyExif(QString filename, QUrl file_url, QUrl page_url, QString
 
 void WebPage::saveReplyToDisk(QNetworkReply * reply)
 {
+    if (!reply->isOpen())
+    {
+        qDebug() << "reply aborted";
+        return;
+    }
     QUrl url = reply->url();
-
-//    if (data.trimmed().startsWith("<"))
     QString content_type = reply->header(QNetworkRequest::ContentTypeHeader).toString();
     QString request_content_type = reply->request().header(QNetworkRequest::ContentTypeHeader).toString();
     if ((!content_type.startsWith(request_content_type) || request_content_type.isEmpty()) &&
             content_type.contains("text/html", Qt::CaseInsensitive) &&
-            !property("temporary").toBool() &&
+            !temporary &&
             !save_page->isActive())
     {
         qDebug() << "redirect detected" <<
@@ -534,9 +548,10 @@ void WebPage::saveReplyToDisk(QNetworkReply * reply)
         WebPage * redirect_page = new WebPage(privacy, this);
         redirect_page->hide();
         connect(redirect_page, SIGNAL(downloadFinished()), this, SIGNAL(downloadFinished()));
-        redirect_page->save_page = save_page;
-        redirect_page->setProperty("requested_url", url);
-        redirect_page->setProperty("temporary", true);
+        connect(redirect_page, SIGNAL(downloadProgress(qint64,qint64)), this, SLOT(updownProgress(qint64,qint64)));
+        * redirect_page->save_page = * save_page;
+        redirect_page->requested_url = url;
+        redirect_page->temporary = true;
         redirect_page->load(url);
         return;
     }
@@ -644,22 +659,19 @@ void WebPage::saveReplyToDisk(const QUrl & url, const QByteArray & data, QString
     }
 }
 
-void WebPage::replyFinished(QNetworkReply * reply)
+void WebPage::downloadFinished(QNetworkReply * reply)
 {
-    qDebug() << "replyFinished" << reply;
-    if (reply)
-    {
-        saveReplyToDisk(reply);
-        delete reply;
-    }
+    qDebug() << "downloadFinished" << reply;
+    saveReplyToDisk(reply);
 
-    if (property("temporary").toBool())
+    ui->progressBar->setValue(0);
+    emit downloadFinished();
+
+    if (temporary)
     {
         qDebug() << "deleting hidden page";
         deleteLater();
     }
-    ui->progressBar->setValue(0);
-    emit downloadFinished();
 }
 
 void WebPage::redirected(const QUrl & url)
@@ -718,10 +730,7 @@ void WebPage::frameCreated(QWebFrame * frame)
 
 void WebPage::downloadRequest(const QNetworkRequest & request)
 {
-    qDebug() << "request" << request.url();
-    QNetworkReply * reply = manager->get(request);
-    connect(reply, SIGNAL(downloadProgress(qint64, qint64)), this, SLOT(updownProgress(qint64, qint64)));
-    qDebug() << "downloading started";
+    manager->downloadRequest(request);
 }
 
 QString WebPage::parseCssBgImageUrl(const QString & css, int & start, int & end)
@@ -912,6 +921,11 @@ bool WebPage::isIncognito() const
     return privacy == IncognitoPrivacy;
 }
 
+bool WebPage::isToolWindow() const
+{
+    return tool_window;
+}
+
 WebPage * WebPage::createToolWindow(QUrl url, QString title, Qt::ConnectionType conn) const
 {
     WebPage * new_webpage = new WebPage(privacy, topLevelWidget());
@@ -928,13 +942,13 @@ WebPage * WebPage::createToolWindow(QUrl url, QString title, Qt::ConnectionType 
     new_webpage->ui->progressBar->hide();
     new_webpage->show();
     new_webpage->activateWindow();
+    new_webpage->tool_window = true;
     QMetaObject::invokeMethod(new_webpage, "load", conn, Q_ARG(QUrl, url));
     return new_webpage;
 }
 
 void WebPage::updownProgress(qint64 processed, qint64 total)
 {
-    qDebug() << "updown" << processed << "/" << total;
     if (total > 0)
     {
         ui->progressBar->setValue(ui->progressBar->maximum() * processed / total);

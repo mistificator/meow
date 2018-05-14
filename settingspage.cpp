@@ -597,6 +597,17 @@ bool SettingsPage::clearDownloadsHistory()
     return model->select();
 }
 
+QString SettingsPage::cookieJar()
+{
+    return appDataDir() + "/cookies.";
+}
+
+bool SettingsPage::clearCookies()
+{
+    SharedCookieJar::clear();
+    return QFile::remove(cookieJar());
+}
+
 void SettingsPage::on_pageEmpty_toggled(bool checked)
 {
     if (checked)
@@ -791,5 +802,7 @@ void SettingsPage::on_openScriptsFolder_clicked()
 void SettingsPage::on_clearHistory_clicked()
 {
     clearCompleterHistory();
+    clearDownloadsHistory();
+    clearCookies();
 }
 

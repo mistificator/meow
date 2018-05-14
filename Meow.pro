@@ -33,7 +33,8 @@ SOURCES += main.cpp\
         filemetadata.cpp \
         settingspage.cpp \
         tabbar.cpp \
-    downloadspage.cpp
+    downloadspage.cpp \
+    downloadmanager.cpp
 
 HEADERS  += mainwindow.h \
             webpage.h \
@@ -44,7 +45,8 @@ HEADERS  += mainwindow.h \
     downloadspage.h \
     utils.h \
     custom_classes.h \
-    web_mime_types.h
+    web_mime_types.h \
+    downloadmanager.h
 
 FORMS    += mainwindow.ui \
             webpage.ui \

@@ -12,6 +12,7 @@
 
 #include "filemetadata.h"
 #include "settingspage.h"
+#include "downloadmanager.h"
 
 namespace Ui {
 class WebPage;
@@ -28,6 +29,7 @@ public:
     QWebView * view() const;
     QWebPage * page() const;
     bool isIncognito() const;
+    bool isToolWindow() const;
     WebPage * createToolWindow(QUrl url, QString title = "", Qt::ConnectionType conn = Qt::QueuedConnection) const;
 public slots:
     void downloadRequest(const QNetworkRequest & request);
@@ -45,6 +47,8 @@ private slots:
     void on_webView_urlChanged(const QUrl &);
     void on_webView_iconChanged();
     void on_webView_loadStarted();
+    void on_actionSearchImage_triggered();
+
     void customContextMenuRequested(const QPoint & pos);
 
     void actionOpenLink();
@@ -54,7 +58,7 @@ private slots:
     void actionDownloadLinkToDisk();
     void actionDownloadImageToDisk();
 
-    void replyFinished(QNetworkReply *);
+    void downloadFinished(QNetworkReply *);
     void linkClicked(QUrl);
     void initialLayoutCompleted();
     void unsupportedContent(QNetworkReply * reply);
@@ -63,8 +67,6 @@ private slots:
     void frameCreated(QWebFrame * frame);
 
     void updownProgress(qint64 processed, qint64 total);
-    void on_actionSearchImage_triggered();
-
 private:
     Ui::WebPage *ui;
     QUrl current_url;
@@ -72,7 +74,6 @@ private:
     QString current_page_title;
     QString current_alt_text;
     QString last_file_name;
-    QNetworkAccessManager * manager;
     FileMetadata fmeta;
     Privacy privacy;
     QString script;
@@ -80,6 +81,11 @@ private:
     QCompleter * completer;
     struct SavePageStruct;
     SavePageStruct * save_page;
+    bool tool_window;
+    bool temporary;
+    QUrl requested_url;
+    DownloadManager * manager;
+    void drawMeowCat();
     void setIncognito();
     void applyIcon();
     void applyTitle();
@@ -98,6 +104,7 @@ signals:
     void newWindowLink(QUrl);
     void linkHovered(const QString & link, const QString & title, const QString & textContent);
     void showNotifier(QString, int timeout = 5000);
+    void downloadProgress(qint64, qint64);
     void downloadFinished();
 };
 
