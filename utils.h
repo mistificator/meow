@@ -8,7 +8,7 @@
 
 namespace Meow
 {
-    QString resourceString(QString rc)
+    static QString resourceString(QString rc)
     {
         QString str;
         QFile file(rc);
@@ -19,12 +19,11 @@ namespace Meow
         }
         return str;
     }
-
-    QRegExp undesiredSymbols(QString str = "\"&,\\:?/*|<>")
+    static QRegExp undesiredSymbols(QString str = "\"&,\\:?/*|<>")
     {
         return QRegExp("[" + str + "]");
     }
-    QString excludeUndesiredSymbols(QString source, QString replacer = QString(), QRegExp undesired_symbols = undesiredSymbols())
+    static QString excludeUndesiredSymbols(QString source, QString replacer = QString(), QRegExp undesired_symbols = undesiredSymbols())
     {
         return source.replace(undesired_symbols, replacer);
     }

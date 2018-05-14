@@ -25,54 +25,14 @@
 #include "utils.h"
 #include "custom_classes.h"
 #include "web_mime_types.h"
-
-struct WebPage::SavePageStruct
-{
-    SavePageStruct(QString _path = QString())
-    {
-        activate(_path);
-        switchRelative();
-    }
-    void activate(QString _path)
-    {
-        p_path = _path;
-    }
-    QString path() const
-    {
-        return p_path;
-    }
-    bool isActive() const
-    {
-        return !p_path.isEmpty();
-    }
-    void switchRelative()
-    {
-        p_root = false;
-    }
-    void switchRoot()
-    {
-        p_root = true;
-    }
-    bool isRoot() const
-    {
-        return p_root;
-    }
-    void reset()
-    {
-        p_path.clear();
-    }
-private:
-    QString p_path;
-    bool p_root;
-};
-
+#include "downloadmanager.h"
+#include "filemanager.h"
 
 WebPage::WebPage(Privacy _privacy, QWidget *parent) :
     QWidget(parent),
     ui(new Ui::WebPage),
     privacy(_privacy),
     script("// sample script\r\ndocument.title = \"This is the new page title.\";"),
-    save_page(new SavePageStruct()),
     tool_window(false),
     temporary(false)
 {
@@ -152,24 +112,26 @@ WebPage::WebPage(Privacy _privacy, QWidget *parent) :
         setWindowIcon(style()->standardIcon(QStyle::SP_DesktopIcon));
     }
 
-    manager = new DownloadManager();
-    connect(manager, SIGNAL(downloadProgress(qint64,qint64)), this, SLOT(updownProgress(qint64,qint64)));
-    connect(manager, SIGNAL(downloadProgress(qint64,qint64)), this, SIGNAL(downloadProgress(qint64,qint64)));
-    connect(manager, SIGNAL(downloadFinished(QNetworkReply *)), this, SLOT(downloadFinished(QNetworkReply *)));
-    manager->setCookieJar(new SharedCookieJar((SettingsPage::Privacy)privacy));
-
+    dmanager = new DownloadManager();
+    connect(dmanager, SIGNAL(downloadProgress(qint64,qint64)), this, SLOT(updownProgress(qint64,qint64)));
+    connect(dmanager, SIGNAL(downloadProgress(qint64,qint64)), this, SIGNAL(downloadProgress(qint64,qint64)));
+    connect(dmanager, SIGNAL(downloadFinished(QNetworkReply *)), this, SLOT(downloadFinished(QNetworkReply *)));
+    dmanager->setCookieJar(new SharedCookieJar((SettingsPage::Privacy)privacy));
     page()->networkAccessManager()->setCookieJar(new SharedCookieJar((SettingsPage::Privacy)privacy));
+
+    fmanager = new FileManager(this);
+    fmanager->setWebPage(this);
+    connect(fmanager, SIGNAL(showNotifier(QString,int)), this, SIGNAL(showNotifier(QString,int)));
 }
 
 WebPage::~WebPage()
 {
-    if (manager->currentReply() && manager->currentReply()->isRunning())
+    if (dmanager->currentReply() && dmanager->currentReply()->isRunning())
     {
-        connect(manager, SIGNAL(downloadFinished(QNetworkReply*)), manager, SLOT(deleteLater()), Qt::QueuedConnection);
+        connect(dmanager, SIGNAL(downloadFinished(QNetworkReply*)), dmanager, SLOT(deleteLater()), Qt::QueuedConnection);
     }
     page()->networkAccessManager()->setCookieJar(new QNetworkCookieJar()); // force prev jar dtor calling
     delete ui;
-    delete save_page;
 }
 
 QWebView * WebPage::view() const
@@ -453,216 +415,24 @@ void WebPage::actionDownloadImageToDisk()
     current_alt_text = res.element().attribute("alt");
 }
 
-QString WebPage::adjustFilename(QString filename, QString content, const QByteArray & data)
+WebPage * WebPage::createHiddenWindow(QUrl url, Qt::ConnectionType conn) const
 {
-    QString known_content;
-    if (filename.isEmpty())
-    {
-        filename = "index";
-    }
-    if (!content.isEmpty())
-    {
-        known_content = Meow::contentTypeForSuffix(QFileInfo(filename).suffix());
-        if (QFileInfo(filename).suffix().isEmpty() || known_content.isEmpty() || (!known_content.isEmpty() && !content.startsWith(known_content, Qt::CaseInsensitive)))
-        {
-            QString known_suffix = Meow::suffixForContentType(content);
-            if (!known_suffix.isEmpty())
-            {
-                filename += known_suffix;
-//                qDebug() << "adjusted filename" << filename << "content" << Meow::adjustedContentType(content);
-                return filename;
-            }
-        }
-        else
-        {
-//            qDebug() << "adjusted filename" << filename << "content" << Meow::adjustedContentType(content);
-            return filename;
-        }
-    }
-    if (!QFileInfo(filename).suffix().isEmpty())
-    {
-        known_content = Meow::contentTypeForSuffix(QFileInfo(filename).suffix());
-    }
-    if (QFileInfo(filename).suffix().isEmpty() || known_content.isEmpty())
-    {
-        QBuffer buf;
-        buf.setData(data);
-        QImageReader img(& buf);
-        if (img.canRead())
-        {
-            filename += "." + img.format();
-        }
-        else
-        if (data.trimmed().startsWith("<"))
-        {
-            filename += ".html";
-        }
-    }
-//    qDebug() << "adjusted filename" << filename;
-    return filename;
-}
-
-void WebPage::modifyExif(QString filename, QUrl file_url, QUrl page_url, QStringList tags)
-{
-    tags.removeDuplicates();
-    if (fmeta.setImage(filename))
-    {        
-        qDebug() << filename << tags << file_url << page_url;
-        if (
-                fmeta.setField(FileMetadata::TagXPKeywords, tags.join("; ")) &&
-                fmeta.setField(FileMetadata::TagExifUserComment, file_url.toString() + "\n\n" + page_url.toString())
-            )
-        {
-            qDebug() << "properties of" << QFileInfo(filename).fileName() << "updated";
-        }
-        else
-        {
-            qDebug() << "properties of" << QFileInfo(filename).fileName() << "NOT updated";
-        }
-    }
-    else
-    {
-        qDebug() << "couldn't open" << QFileInfo(filename).fileName() << "to update properties";
-    }
-}
-
-void WebPage::saveReplyToDisk(QNetworkReply * reply)
-{
-    if (!reply->isOpen())
-    {
-        qDebug() << "reply aborted";
-        return;
-    }
-    QUrl url = reply->url();
-    QString content_type = reply->header(QNetworkRequest::ContentTypeHeader).toString();
-    QString request_content_type = reply->request().header(QNetworkRequest::ContentTypeHeader).toString();
-    if ((!content_type.startsWith(request_content_type) || request_content_type.isEmpty()) &&
-            content_type.contains("text/html", Qt::CaseInsensitive) &&
-            !temporary &&
-            !save_page->isActive())
-    {
-        qDebug() << "redirect detected" <<
-                    url <<
-                    reply->header(QNetworkRequest::ContentTypeHeader).toString();
-        qDebug() << "creating hidden page";
-        WebPage * redirect_page = new WebPage(privacy, this);
-        redirect_page->hide();
-        connect(redirect_page, SIGNAL(downloadFinished()), this, SIGNAL(downloadFinished()));
-        connect(redirect_page, SIGNAL(downloadProgress(qint64,qint64)), this, SLOT(updownProgress(qint64,qint64)));
-        * redirect_page->save_page = * save_page;
-        redirect_page->requested_url = url;
-        redirect_page->temporary = true;
-        redirect_page->load(url);
-        return;
-    }
-    saveReplyToDisk(url, reply->readAll(), content_type);
-}
-
-void WebPage::saveReplyToDisk(const QUrl & url, const QByteArray & data, QString content_type)
-{
-    qDebug() << "saveReplyToDisk" << url;
-
-    QString url_adjusted = url.toString(QUrl::RemoveScheme | QUrl::RemovePort);
-    QString filename = Meow::excludeUndesiredSymbols(QFileInfo(url_adjusted).fileName());
-    filename = adjustFilename(filename, content_type, data);
-    QString path;
-    if (!save_page->isActive())
-    {
-        switch (SettingsPage::savePolicy())
-        {
-        case SettingsPage::SaveAsk:
-            {
-                QString save_file_name = QFileDialog::getSaveFileName(topLevelWidget(), "Download file \"" + filename + "\"", SettingsPage::currentSavePath() + "/" + filename);
-                if (save_file_name.isEmpty())
-                {
-                    return;
-                }
-                path = QFileInfo(save_file_name).dir().path() + "/";
-                filename = QFileInfo(save_file_name).fileName();
-                SettingsPage::setCurrentSavePath(path);
-            }
-            break;
-        case SettingsPage::SaveSilent:
-            {
-            //    QString dir = QFileInfo(url_adjusted).dir().path();
-                QString dir = QFileInfo(current_url.toString(QUrl::RemoveScheme | QUrl::RemovePort)).dir().path();
-//                qDebug() << "download" << dir << filename;
-                path = SettingsPage::savePath() + "/" + dir + "/";
-                QDir().mkpath(path);
-            }
-            break;
-        }
-    }
-    else
-    {
-        QString dir = QFileInfo(url_adjusted).dir().path();
-//        QString dir = QFileInfo(current_url.toString(QUrl::RemoveScheme | QUrl::RemovePort)).dir().path();
-        path = save_page->path() + "/";
-        if (!save_page->isRoot())
-        {
-            path += dir +"/";
-        }
-        QDir().mkpath(path);
-        int i = 2;
-        QString src_filename = filename;
-        while (QFile::exists(path + filename))
-        {
-            filename = QFileInfo(src_filename).baseName() + "_" + QString::number(i) + "." + QFileInfo(src_filename).completeSuffix();
-            i++;
-        }
-    }
-
-    last_file_name = QString(path + filename).replace(QRegExp("[\\/]+"), "/");
-    QFile file(last_file_name);
-    if (!data.isEmpty() && file.open(QFile::WriteOnly))
-    {
-        file.write(data);
-        file.close();
-
-        SettingsPage::addDownloadEntry(file.fileName(), url.toString(), current_url.toString(), file.size(), current_page_title, current_alt_text);
-
-        if (SettingsPage::writeMetadataEnabed() && content_type.startsWith("image", Qt::CaseInsensitive))
-        {
-            modifyExif(
-                        file.fileName(),
-                        url,
-                        current_url,
-                        QStringList() <<
-                            Meow::excludeUndesiredSymbols(current_page_title) <<
-                            Meow::excludeUndesiredSymbols(current_alt_text) <<
-                            Meow::excludeUndesiredSymbols(current_url.host()) <<
-                            Meow::excludeUndesiredSymbols(url.host())
-                        );
-        }
-
-        if (SettingsPage::savePolicy() == SettingsPage::SaveSilent && !save_page->isActive())
-        {
-            QString link;
-            int count = 0;
-            do
-            {
-                link = SettingsPage::savePath() + "/" + filename + (count > 0 ? "(" + QString::number(count) + ")" : "");
-        #ifdef Q_OS_WIN
-                link += ".lnk";
-        #endif
-                count++;
-            }
-            while (QFile::exists(link));
-            file.link(link);
-        }
-
-        emit showNotifier("\"" + filename + "\" downloaded");
-    }
-    else
-    {
-        emit showNotifier("\"" + filename + "\" download failed");
-    }
+    qDebug() << "creating hidden page";
+    WebPage * redirect_page = new WebPage(privacy, const_cast<WebPage *>(this));
+    redirect_page->hide();
+    connect(redirect_page, SIGNAL(downloadFinished()), this, SIGNAL(downloadFinished()));
+    connect(redirect_page, SIGNAL(downloadProgress(qint64,qint64)), this, SLOT(updownProgress(qint64,qint64)));
+    redirect_page->fmanager->setStateFrom(fmanager);
+    redirect_page->requested_url = url;
+    redirect_page->temporary = true;
+    QMetaObject::invokeMethod(redirect_page, "load", conn, Q_ARG(QUrl, url));
+    return redirect_page;
 }
 
 void WebPage::downloadFinished(QNetworkReply * reply)
 {
     qDebug() << "downloadFinished" << reply;
-    saveReplyToDisk(reply);
+    fmanager->saveReplyToDisk(reply);
 
     ui->progressBar->setValue(0);
     emit downloadFinished();
@@ -730,167 +500,7 @@ void WebPage::frameCreated(QWebFrame * frame)
 
 void WebPage::downloadRequest(const QNetworkRequest & request)
 {
-    manager->downloadRequest(request);
-}
-
-QString WebPage::parseCssBgImageUrl(const QString & css, int & start, int & end)
-{
-    QRegExp re("url\\s*\\(\\s*[\\/:\"'&?=\\.\\+\\-%\\w]*\\s*\\)");
-    start = re.indexIn(css, start);
-    if (start < 0)
-    {
-        end = -1;
-        return QString();
-    }
-    end = start + re.matchedLength();
-    return css.mid(start, end - start).replace(QRegExp("url\\s*\\(\\s*[\"']*"), "").replace(QRegExp("\\s*[\"']*\\s*\\)"), "");
-}
-
-QString WebPage::savePageElement(QString tag, QString attr, QString value)
-{
-    if (value.isEmpty() ||
-            (tag.compare("img", Qt::CaseInsensitive) == 0 && value.endsWith(".ico", Qt::CaseInsensitive)) ||
-            (tag.compare("a", Qt::CaseInsensitive) == 0 && value == "#"))
-    {
-        return QString();
-    }
-    if (attr == "style")
-    {
-        int start = 0, end = 0;
-        value = parseCssBgImageUrl(value, start, end);
-        if (start == -1 || value.isEmpty())
-        {
-            return QString();
-        }
-    }
-    QUrl url(value);
-    qDebug() << tag << attr << value << url << url.host();
-    if (url.host().isEmpty())
-    {
-        url = QUrl("//" + current_url.host() + url.toString());
-    }
-    if (url.scheme().isEmpty())
-    {
-        url.setScheme(current_url.scheme());
-    }
-    if (tag.compare("a", Qt::CaseInsensitive) == 0 /*|| tag.compare("link", Qt::CaseInsensitive) == 0*/)
-    {
-        return url.toString();
-    }
-    qDebug() << tag << attr << value << url;
-    QEventLoop loop;
-    connect(this, SIGNAL(downloadFinished()), & loop, SLOT(quit()));
-//    downloadRequest(CustomNetworkRequest(QUrl(current_url.host()).resolved(url)));
-    downloadRequest(CustomNetworkRequest(url));
-    loop.exec();
-    QDir().mkpath(QFileInfo(last_file_name).absolutePath());
-    return QDir(save_page->path()).relativeFilePath(last_file_name);
-}
-
-void WebPage::saveCurrentPage()
-{
-    qDebug() << "save page";
-    save_page->switchRelative();
-    if (SettingsPage::savePolicy() == SettingsPage::SaveAsk)
-    {
-        QString path = QFileDialog::getExistingDirectory(topLevelWidget(), "Folder to save page", SettingsPage::currentSavePath());
-        if (path.isEmpty())
-        {
-            return;
-        }
-        SettingsPage::setCurrentSavePath(path);
-        save_page->activate(path);
-    }
-    else
-    {
-        save_page->activate(SettingsPage::savePath() + "/pages/" + Meow::excludeUndesiredSymbols(current_page_title) + "/");
-    }
-    setEnabled(false);
-    QProgressDialog * progress = new QProgressDialog(view());
-    progress->setWindowTitle("Saving page");
-    progress->setWindowFlags(Qt::CustomizeWindowHint | Qt::Tool | Qt::WindowCloseButtonHint);
-    progress->setMinimumDuration(500);
-    view()->stop();
-    QDir().mkpath(save_page->path());
-    QWebElement document = page()->mainFrame()->documentElement();
-    QMultiMap< QString, QList<QWebElement> > map;
-    QList<QWebElement> list;
-    int count = 0;
-    list = document.findAll("img").toList();
-    map.insertMulti("src", list); count += list.count();
-    list = document.findAll("script").toList();
-    map.insertMulti("src", list); count += list.count();
-    list = document.findAll("link").toList();
-    map.insertMulti("href", list); count += list.count();
-    list = document.findAll("a").toList();
-    map.insertMulti("href", list); count += list.count();
-    map.insertMulti("style", list); count += list.count();
-    list = document.findAll("div").toList();
-    map.insertMulti("style", list); count += list.count();
-    list = document.findAll("span").toList();
-    map.insertMulti("style", list); count += list.count();
-    progress->setMaximum(0);
-    progress->setWindowModality(Qt::NonModal);
-
-    foreach (QWebElement el, document.findAll("style").toList())
-    {
-        if (progress->wasCanceled())
-        {
-            break;
-        }
-        QString css = el.toPlainText();
-        int end = 0;
-        while (end >= 0)
-        {
-            if (progress->wasCanceled())
-            {
-                break;
-            }
-            int start = end;
-            QString url = parseCssBgImageUrl(css, start, end);
-            if (start >= 0 && !url.isEmpty())
-            {
-                QString res = savePageElement(QString(), QString(), url);
-                if (!res.isEmpty())
-                {
-                    css = css.remove(start, end - start).insert(start, "url('" + res + "')");
-                    end += (5 + res.length() + 2) - (end - start);
-                }
-            }
-        }
-
-        el.setPlainText(css);
-    }
-
-    progress->setMaximum(count);
-
-    int k = 0;
-    for (QMultiMap< QString, QList<QWebElement> >::iterator i = map.begin(); i != map.end(); ++i)
-    {
-        if (progress->wasCanceled())
-        {
-            break;
-        }
-        QString url_attr = i.key();
-        foreach (QWebElement el, i.value())
-        {
-            progress->setValue(k++);
-            QString res = savePageElement(el.tagName(), url_attr, el.attribute(url_attr));
-            if (!res.isEmpty())
-            {
-                el.setAttribute(url_attr, res);
-            }
-        }
-    }
-    save_page->switchRoot();
-    saveReplyToDisk(Meow::excludeUndesiredSymbols(current_page_title) + ".html", page()->mainFrame()->toHtml().toUtf8(), "text/html");
-//    QString full_path = "file:///" + save_page.path + Meow::excludeUndesiredSymbols(current_page_title) + ".html";
-    QString full_path = "file:///" + last_file_name;
-    save_page->reset();
-    load(full_path);
-    progress->hide();
-    progress->deleteLater();
-    setEnabled(true);
+    dmanager->downloadRequest(request);
 }
 
 void WebPage::unsupportedContent(QNetworkReply * reply)
@@ -924,6 +534,11 @@ bool WebPage::isIncognito() const
 bool WebPage::isToolWindow() const
 {
     return tool_window;
+}
+
+bool WebPage::isHiddenWindow() const
+{
+    return temporary;
 }
 
 WebPage * WebPage::createToolWindow(QUrl url, QString title, Qt::ConnectionType conn) const
@@ -981,4 +596,9 @@ void WebPage::on_actionSearchImage_triggered()
             emit newWindowLink(QUrl(image_search_url));
         }
     }
+}
+
+void WebPage::savePage()
+{
+    fmanager->savePage();
 }

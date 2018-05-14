@@ -10,14 +10,14 @@
 #include <QtWebKitWidgets/QWebInspector>
 #include <QCompleter>
 
-#include "filemetadata.h"
 #include "settingspage.h"
-#include "downloadmanager.h"
 
 namespace Ui {
 class WebPage;
 }
 
+class FileManager;
+class DownloadManager;
 class WebPage : public QWidget
 {
     Q_OBJECT
@@ -30,13 +30,20 @@ public:
     QWebPage * page() const;
     bool isIncognito() const;
     bool isToolWindow() const;
+    bool isHiddenWindow() const;
     WebPage * createToolWindow(QUrl url, QString title = "", Qt::ConnectionType conn = Qt::QueuedConnection) const;
+    WebPage * createHiddenWindow(QUrl url, Qt::ConnectionType conn = Qt::QueuedConnection) const;
+
+    QUrl currentUrl() const { return current_url; }
+    QString currentAltText() const { return current_alt_text; }
+    QString currentPageTitle() const { return current_page_title; }
+    QPoint currentPos() const { return current_pos; }
 public slots:
     void downloadRequest(const QNetworkRequest & request);
-    void saveCurrentPage();
     void runScript();
     void inspectCurrentElement();
     void load(const QUrl & url);
+    void savePage();
 private slots:
     void on_actionLoadPage_triggered();
     void on_actionReloadPage_triggered();
@@ -74,30 +81,22 @@ private:
     QString current_page_title;
     QString current_alt_text;
     QString last_file_name;
-    FileMetadata fmeta;
     Privacy privacy;
     QString script;
     QWebInspector * inspector;
     QCompleter * completer;
-    struct SavePageStruct;
-    SavePageStruct * save_page;
     bool tool_window;
     bool temporary;
     QUrl requested_url;
-    DownloadManager * manager;
+    DownloadManager * dmanager;
+    FileManager * fmanager;
     void drawMeowCat();
     void setIncognito();
     void applyIcon();
     void applyTitle();
     QWebHitTestResult hitTest(QPoint) const;
-    static QString adjustFilename(QString filename, QString content, const QByteArray & data);
-    void saveReplyToDisk(QNetworkReply * reply);
-    void saveReplyToDisk(const QUrl & url, const QByteArray & data, QString content_type);
-    void modifyExif(QString filename, QUrl file_url, QUrl page_url, QStringList tags);
     void runUserScriptRecursive(QWebFrame *);
     void updateCompleter(QString, QString);
-    QString parseCssBgImageUrl(const QString & css, int & start, int & end);
-    QString savePageElement(QString tag, QString attr, QString value);
 protected:
     void showEvent(QShowEvent *);
 signals:

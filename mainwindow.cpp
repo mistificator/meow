@@ -345,7 +345,7 @@ void MainWindow::on_actionSavePage_triggered()
 {
     if (WebPage * webpage = dynamic_cast<WebPage *>(ui->tabWidget->widget(ui->tabWidget->currentIndex())))
     {
-         webpage->saveCurrentPage();
+         webpage->savePage();
     }
 }
 

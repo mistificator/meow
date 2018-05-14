@@ -34,7 +34,8 @@ SOURCES += main.cpp\
         settingspage.cpp \
         tabbar.cpp \
     downloadspage.cpp \
-    downloadmanager.cpp
+    downloadmanager.cpp \
+    filemanager.cpp
 
 HEADERS  += mainwindow.h \
             webpage.h \
@@ -46,7 +47,8 @@ HEADERS  += mainwindow.h \
     utils.h \
     custom_classes.h \
     web_mime_types.h \
-    downloadmanager.h
+    downloadmanager.h \
+    filemanager.h
 
 FORMS    += mainwindow.ui \
             webpage.ui \

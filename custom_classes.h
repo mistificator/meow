@@ -14,6 +14,7 @@
 #include <QtWebKitWidgets/QWebFrame>
 #include <QtWebKit/QWebElement>
 #include <QApplication>
+#include <QFileInfo>
 
 #include "settingspage.h"
 #include "webpage.h"

@@ -57,7 +57,8 @@ var url_filters =
 	"traffichaus.com",
 	"click.",
 	"clicks.",
-	"refer."
+	"refer.",
+	"advert"
 ];
 
 var keyword_filters =
