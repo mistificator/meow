@@ -52,8 +52,6 @@ WebPage::WebPage(Privacy _privacy, QWidget *parent) :
     ui->dockWidget->setWidget(inspector);
     ui->dockWidget->hide();
 
-    connect(this, SIGNAL(showNotifier(QString, int)), dynamic_cast<MainWindow *>(topLevelWidget()), SLOT(showNotifier(QString, int)));
-
     connect(view(), SIGNAL(customContextMenuRequested(QPoint)), this, SLOT(customContextMenuRequested(QPoint)));
     connect(view()->pageAction(QWebPage::OpenLink), SIGNAL(triggered()), this, SLOT(actionOpenLink()));
     connect(view()->pageAction(QWebPage::OpenLinkInNewWindow), SIGNAL(triggered()), this, SLOT(actionOpenLinkInNewWindow()));
@@ -162,16 +160,9 @@ void WebPage::on_actionLoadPage_triggered()
     {
         if (!url.toString().contains("."))
         {
-            QString search_engine = SettingsPage::currentSearchEngineUrl();
-            if (search_engine.contains("%1"))
-            {
-                url = search_engine.arg(QString(url_copy.toEncoded()));
-                updateCompleter(url_copy.toString(QUrl::RemoveScheme | QUrl::RemovePort), "");
-            }
-            else
+            QString search_engine = SettingsPage::currentSearchEngineUrl().arg(QString(url_copy.toEncoded()));
             if (!search_engine.isEmpty())
             {
-                url = search_engine + url_copy.toEncoded();
                 updateCompleter(url_copy.toString(QUrl::RemoveScheme | QUrl::RemovePort), "");
             }
             else
@@ -340,6 +331,10 @@ void WebPage::customContextMenuRequested(const QPoint & pos)
     if (menu->actions().contains(view()->pageAction(QWebPage::OpenImageInNewWindow)))
     {
         menu->insertAction(view()->pageAction(QWebPage::OpenImageInNewWindow), ui->actionSearchImage);
+    }
+    if (!page()->selectedText().isEmpty())
+    {
+        menu->insertAction(menu->actions().first(), ui->actionTranslateSelected);
     }
     menu->exec(mapToGlobal(current_pos = pos));
     menu->deleteLater();
@@ -584,24 +579,23 @@ void WebPage::on_actionSearchImage_triggered()
     QUrl url = hitTest(current_pos).imageUrl();
     if (!url.isEmpty() && url.isValid())
     {
-        QString image_search_url = SettingsPage::currentImageSearchEngineUrl();
-        if (!image_search_url.isEmpty())
-        {
-            if (image_search_url.contains("%1"))
-            {
-                image_search_url = image_search_url.arg(url.toString());
-            }
-            else
-            {
-                image_search_url += url.toString();
-            }
-            qDebug() << "search image url" << image_search_url;
-            emit newWindowLink(QUrl(image_search_url));
-        }
+        QString image_search_url = SettingsPage::currentImageSearchEngineUrl().arg(url.toString());
+        qDebug() << "search image url" << image_search_url;
+        emit newWindowLink(QUrl(image_search_url));
     }
 }
 
 void WebPage::savePage()
 {
     fmanager->savePage();
+}
+
+void WebPage::on_actionTranslateSelected_triggered()
+{
+    if (!page()->selectedText().isEmpty())
+    {
+        QString translate_url = SettingsPage::currentTranslateEngineUrl().arg(page()->selectedText());
+        qDebug() << "translate url" << translate_url;
+        emit newWindowLink(QUrl(translate_url));
+    }
 }

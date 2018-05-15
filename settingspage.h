@@ -52,6 +52,12 @@ public:
     static int currentImageSearchEngine();
     static QString currentImageSearchEngineUrl();
 
+    static bool setTranslateEngines(QStringList);
+    static QStringList translateEngines();
+    static bool setCurrentTranslateEngine(int);
+    static int currentTranslateEngine();
+    static QString currentTranslateEngineUrl();
+
     enum SavePolicy {SaveAsk = 0, SaveSilent = 1};
     static bool setSavePolicy(SavePolicy);
     static SavePolicy savePolicy();
@@ -92,6 +98,7 @@ public:
 signals:
     void proxyChanged(SettingsPage::ProxyType);
     void privacyChanged(SettingsPage::Privacy);
+    void showNotifier(QString, int timeout = 5000);
 private slots:
     void on_pageEmpty_toggled(bool checked);
     void on_pageLast_toggled(bool checked);
@@ -116,10 +123,13 @@ private slots:
     void on_reloadScripts_clicked();
     void on_openScriptsFolder_clicked();
     void on_clearHistory_clicked();
+    void on_translateRemove_clicked();
+    void on_translateEngine_currentIndexChanged(int index);
 private:
     Ui::SettingsPage *ui;
     QStringList updateSearchEngines();
     QStringList updateImageSearchEngines();
+    QStringList updateTranslateEngines();
     void updateScriptsLoaded();
     static QString user_script;
     static int loaded_scripts_count;

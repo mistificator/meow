@@ -17,6 +17,7 @@
 
 #include "custom_classes.h"
 #include "utils.h"
+#include "mainwindow.h"
 
 int SettingsPage::loaded_scripts_count = 0;
 QString SettingsPage::user_script;
@@ -51,6 +52,11 @@ SettingsPage::SettingsPage(QWidget *parent) :
     ui->imageSearchEngine->addItems(imageSearchEngines());
     ui->imageSearchEngine->setCurrentIndex(image_engine_index);
     ui->imageSearchRemove->setIcon(style()->standardIcon(QStyle::SP_LineEditClearButton));
+
+    const int translate_engine_index = currentTranslateEngine();
+    ui->translateEngine->addItems(translateEngines());
+    ui->translateEngine->setCurrentIndex(translate_engine_index);
+    ui->translateRemove->setIcon(style()->standardIcon(QStyle::SP_LineEditClearButton));
 
     SavePolicy save_policy = savePolicy();
     ui->saveAsk->setChecked(save_policy == SaveAsk);
@@ -193,6 +199,7 @@ QSqlDatabase SettingsPage::databaseSettings()
     return db;
 }
 
+#include <QLocale>
 void SettingsPage::databaseSettingsInit(QSqlDatabase & db)
 {
     QSqlQuery q(db);
@@ -211,7 +218,8 @@ void SettingsPage::databaseSettingsInit(QSqlDatabase & db)
     setImageSearchEngines(QStringList() <<
                      "google.com/searchbyimage?image_url=%1" <<
                      "yandex.com/images/search?rpt=imageview&url=%1");
-
+    setTranslateEngines(QStringList() <<
+                     "translate.google.ru/?hl=#auto/" + QLocale::system().bcp47Name().left(2) + "/%1");
     QString download_location;
 #if QT_VERSION >= 0x050000
     QStringList list = QStandardPaths::standardLocations(QStandardPaths::DownloadLocation);
@@ -399,6 +407,10 @@ QString SettingsPage::currentSearchEngineUrl()
     {
         url = "https://" + url;
     }
+    if (!url.contains("%1"))
+    {
+        url += "%1";
+    }
     return url;
 }
 
@@ -439,6 +451,55 @@ QString SettingsPage::currentImageSearchEngineUrl()
     if (QUrl(url).scheme().isEmpty())
     {
         url = "https://" + url;
+    }
+    if (!url.contains("%1"))
+    {
+        url += "%1";
+    }
+    return url;
+}
+
+bool SettingsPage::setTranslateEngines(QStringList list)
+{
+    return setValue("TranslateEngines", list.join("\n"));
+}
+
+QStringList SettingsPage::translateEngines()
+{
+    return value("TranslateEngines").split("\n");
+}
+
+bool SettingsPage::setCurrentTranslateEngine(int index)
+{
+    return setValue("TranslateEngineCurrent", QString::number(index));
+}
+
+int SettingsPage::currentTranslateEngine()
+{
+    const int index = value("TranslateEngineCurrent").toInt();
+    if (index < 0 || index >= translateEngines().count())
+    {
+        return -1;
+    }
+    return index;
+}
+
+QString SettingsPage::currentTranslateEngineUrl()
+{
+    const int index = value("TranslateEngineCurrent").toInt();
+    const QStringList engines = translateEngines();
+    if (index < 0 || index >= engines.count())
+    {
+        return QString();
+    }
+    QString url(engines.at(index));
+    if (QUrl(url).scheme().isEmpty())
+    {
+        url = "https://" + url;
+    }
+    if (!url.contains("%1"))
+    {
+        url += "%1";
     }
     return url;
 }
@@ -683,7 +744,19 @@ QStringList SettingsPage::updateImageSearchEngines()
     for (int i = 0; i < ui->imageSearchEngine->count(); i++)
     {
         QString url =  ui->imageSearchEngine->itemText(i);
-        ui->searchEngine->setItemIcon(i, QWebSettings::iconForUrl(QUrl("https://" + QUrl(url).host()))); // doesn't work
+        ui->imageSearchEngine->setItemIcon(i, QWebSettings::iconForUrl(QUrl("https://" + QUrl(url).host()))); // doesn't work
+        list << url;
+    }
+    return list;
+}
+
+QStringList SettingsPage::updateTranslateEngines()
+{
+    QStringList list;
+    for (int i = 0; i < ui->translateEngine->count(); i++)
+    {
+        QString url =  ui->translateEngine->itemText(i);
+        ui->translateEngine->setItemIcon(i, QWebSettings::iconForUrl(QUrl("https://" + QUrl(url).host()))); // doesn't work
         list << url;
     }
     return list;
@@ -713,6 +786,19 @@ void SettingsPage::on_imageSearchRemove_clicked()
     ui->imageSearchEngine->removeItem(ui->imageSearchEngine->currentIndex());
     setImageSearchEngines(updateImageSearchEngines());
     setCurrentImageSearchEngine(ui->imageSearchEngine->currentIndex());
+}
+
+void SettingsPage::on_translateEngine_currentIndexChanged(int index)
+{
+    setTranslateEngines(updateTranslateEngines());
+    setCurrentTranslateEngine(index);
+}
+
+void SettingsPage::on_translateRemove_clicked()
+{
+    ui->translateEngine->removeItem(ui->translateEngine->currentIndex());
+    setTranslateEngines(updateTranslateEngines());
+    setCurrentTranslateEngine(ui->translateEngine->currentIndex());
 }
 
 void SettingsPage::on_saveAsk_toggled(bool checked)
@@ -784,6 +870,7 @@ void SettingsPage::on_reloadScripts_clicked()
 {
     loadScripts();
     updateScriptsLoaded();
+    emit showNotifier("Scripts updated");
 }
 
 void SettingsPage::updateScriptsLoaded()
@@ -805,5 +892,7 @@ void SettingsPage::on_clearHistory_clicked()
     clearCompleterHistory();
     clearDownloadsHistory();
     clearCookies();
+
+    emit showNotifier("History cleared");
 }
 

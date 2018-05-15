@@ -55,6 +55,7 @@ private slots:
     void on_webView_iconChanged();
     void on_webView_loadStarted();
     void on_actionSearchImage_triggered();
+    void on_actionTranslateSelected_triggered();
 
     void customContextMenuRequested(const QPoint & pos);
 

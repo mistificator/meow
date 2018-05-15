@@ -114,6 +114,8 @@ void MainWindow::on_actionAddTab_triggered()
 
     connect(last_page, SIGNAL(newWindowLink(QUrl)), this, SLOT(newWindowLink(QUrl)));
     connect(last_page, SIGNAL(linkHovered(QString, QString, QString)), this, SLOT(linkHovered(QString, QString, QString)));
+    connect(last_page, SIGNAL(showNotifier(QString, int)), this, SLOT(showNotifier(QString, int)));
+
 }
 
 void MainWindow::on_actionAddIncognitoTab_triggered()
@@ -126,7 +128,7 @@ void MainWindow::on_actionAddIncognitoTab_triggered()
 
     connect(last_page, SIGNAL(newWindowLink(QUrl)), this, SLOT(newWindowLink(QUrl)));
     connect(last_page, SIGNAL(linkHovered(QString, QString, QString)), this, SLOT(linkHovered(QString, QString, QString)));
-
+    connect(last_page, SIGNAL(showNotifier(QString, int)), this, SLOT(showNotifier(QString, int)));
 }
 
 void MainWindow::on_tabWidget_tabCloseRequested(int index)
@@ -229,6 +231,7 @@ void MainWindow::on_actionShowSettings_triggered()
     settings_page->setWidget(page = new SettingsPage());
     connect(page, SIGNAL(proxyChanged(SettingsPage::ProxyType)), this, SLOT(proxyChanged(SettingsPage::ProxyType)));
     connect(page, SIGNAL(privacyChanged(SettingsPage::Privacy)), this, SLOT(privacyChanged(SettingsPage::Privacy)));
+    connect(page, SIGNAL(showNotifier(QString, int)), this, SLOT(showNotifier(QString, int)));
 }
 
 void MainWindow::on_actionShowDownloads_triggered()

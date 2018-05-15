@@ -151,6 +151,14 @@
     <string>Search image</string>
    </property>
   </action>
+  <action name="actionTranslateSelected">
+   <property name="text">
+    <string>Translate Selected</string>
+   </property>
+   <property name="toolTip">
+    <string>Translate Selected</string>
+   </property>
+  </action>
  </widget>
  <customwidgets>
   <customwidget>
