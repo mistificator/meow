@@ -26,15 +26,15 @@ TARGET =    Meow
 TEMPLATE =  app
 
 
-SOURCES += main.cpp\
-        mainwindow.cpp \
-        webpage.cpp \
-        filemetadata.cpp \
-        settingspage.cpp \
-        tabbar.cpp \
-    downloadspage.cpp \
-    downloadmanager.cpp \
-    filemanager.cpp
+SOURCES +=  main.cpp\
+            mainwindow.cpp \
+            webpage.cpp \
+            filemetadata.cpp \
+            settingspage.cpp \
+            tabbar.cpp \
+            downloadspage.cpp \
+            downloadmanager.cpp \
+            filemanager.cpp
 
 HEADERS  += mainwindow.h \
             webpage.h \
@@ -42,23 +42,22 @@ HEADERS  += mainwindow.h \
             settingspage.h \
             tabbar.h \
             version.h \
-    downloadspage.h \
-    utils.h \
-    custom_classes.h \
-    web_mime_types.h \
-    downloadmanager.h \
-    filemanager.h
+            downloadspage.h \
+            utils.h \
+            custom_classes.h \
+            web_mime_types.h \
+            downloadmanager.h \
+            filemanager.h
 
 FORMS    += mainwindow.ui \
             webpage.ui \
             settingspage.ui \
-    downloadspage.ui
+            downloadspage.ui
 
-win32:
-{
-    DISTFILES += Meow.rc
-    RC_FILE += Meow.rc
+win32: {
+    DISTFILES +=    Meow.rc
+    RC_FILE +=      Meow.rc
 }
 
 RESOURCES += \
-    meow.qrc
+            meow.qrc

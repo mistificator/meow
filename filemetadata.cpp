@@ -1,6 +1,6 @@
 #include "filemetadata.h"
 
-#ifdef __WIN32__
+#ifdef Q_OS_WIN
 
 #include <QDebug>
 #include <QFileInfo>
@@ -160,7 +160,7 @@ bool FileMetadata::setField(int tag, QString value)
 
 #endif
 
-#ifdef __linux__
+#ifdef Q_OS_LINUX
 
 // TODO: use libexif there
 

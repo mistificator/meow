@@ -49,7 +49,7 @@ DownloadsPage::~DownloadsPage()
     delete ui;
 }
 
-#ifdef __linux__
+#ifdef Q_OS_LINUX
 
 #include <QSettings>
 namespace Utils

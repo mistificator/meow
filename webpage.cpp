@@ -427,7 +427,10 @@ WebPage * WebPage::createHiddenWindow(QUrl url, Qt::ConnectionType conn) const
     redirect_page->fmanager->setStateFrom(fmanager);
     redirect_page->requested_url = url;
     redirect_page->temporary = true;
-    QMetaObject::invokeMethod(redirect_page, "load", conn, Q_ARG(QUrl, url));
+    if (!url.isEmpty())
+    {
+        QMetaObject::invokeMethod(redirect_page, "load", conn, Q_ARG(QUrl, url));
+    }
     return redirect_page;
 }
 
@@ -560,7 +563,10 @@ WebPage * WebPage::createToolWindow(QUrl url, QString title, Qt::ConnectionType 
     new_webpage->show();
     new_webpage->activateWindow();
     new_webpage->tool_window = true;
-    QMetaObject::invokeMethod(new_webpage, "load", conn, Q_ARG(QUrl, url));
+    if (!url.isEmpty())
+    {
+        QMetaObject::invokeMethod(new_webpage, "load", conn, Q_ARG(QUrl, url));
+    }
     return new_webpage;
 }
 

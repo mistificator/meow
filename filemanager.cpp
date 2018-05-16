@@ -346,7 +346,6 @@ void FileManager::savePage()
         return;
     }
     qDebug() << "save page";
-    save_page->switchRelative();
     if (SettingsPage::savePolicy() == SettingsPage::SaveAsk)
     {
         QString path = QFileDialog::getExistingDirectory(webpage->topLevelWidget(), "Folder to save page", SettingsPage::currentSavePath());
@@ -361,14 +360,44 @@ void FileManager::savePage()
     {
         save_page->activate(SettingsPage::savePath() + "/pages/" + Meow::excludeUndesiredSymbols(webpage->currentPageTitle()) + "/");
     }
+    webpage->view()->stop();
     webpage->setEnabled(false);
+
+    save_page->switchRoot();
+
+    WebPage * local_page = webpage->createHiddenWindow(QUrl());
+    local_page->disconnect(this);
+    local_page->page()->settings()->setAttribute(QWebSettings::JavascriptEnabled, false);
+
+    // download html
+    {
+        QEventLoop loop;
+        connect(webpage, SIGNAL(downloadFinished()), & loop, SLOT(quit()));
+        webpage->downloadRequest(CustomNetworkRequest(webpage->view()->url()));
+        loop.exec();
+        qDebug() << "download finished" << last_file_name;
+    }
+
+    // set html to hidden page
+    if (QFile::exists(last_file_name))
+    {
+        QFile file(last_file_name);
+        file.open(QFile::ReadOnly);
+        local_page->view()->setHtml(QString::fromUtf8(file.readAll()));
+        local_page->view()->stop();
+        qDebug() << "setting html finished" << last_file_name;
+        file.close();
+        QFile::remove(last_file_name);
+    }
+
+    save_page->switchRelative();
+
     QProgressDialog * progress = new QProgressDialog(webpage->view());
     progress->setWindowTitle("Saving page");
     progress->setWindowFlags(Qt::CustomizeWindowHint | Qt::Tool | Qt::WindowCloseButtonHint);
     progress->setMinimumDuration(500);
-    webpage->view()->stop();
     QDir().mkpath(save_page->path());
-    QWebElement document = webpage->page()->mainFrame()->documentElement();
+    QWebElement document = local_page->page()->mainFrame()->documentElement();
     QMultiMap< QString, QList<QWebElement> > map;
     QList<QWebElement> list;
     int count = 0;
@@ -439,12 +468,12 @@ void FileManager::savePage()
         }
     }
     save_page->switchRoot();
-    saveReplyToDisk(Meow::excludeUndesiredSymbols(webpage->currentPageTitle()) + ".html", webpage->page()->mainFrame()->toHtml().toUtf8(), "text/html");
-//    QString full_path = "file:///" + save_page.path + Meow::excludeUndesiredSymbols(current_page_title) + ".html";
-    QString full_path = "file:///" + last_file_name;
+    qDebug() << "final save to disk";
+    saveReplyToDisk(Meow::excludeUndesiredSymbols(webpage->currentPageTitle()) + ".html", local_page->page()->mainFrame()->toHtml().toUtf8(), "text/html");
     save_page->reset();
-    webpage->load(full_path);
+    QMetaObject::invokeMethod(webpage, "newWindowLink", Qt::QueuedConnection, Q_ARG(QUrl, QUrl("file:///" + last_file_name)));
     progress->hide();
     progress->deleteLater();
+    local_page->deleteLater();
     webpage->setEnabled(true);
 }
