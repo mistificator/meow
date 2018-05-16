@@ -107,9 +107,10 @@ MainWindow::~MainWindow()
 void MainWindow::on_actionAddTab_triggered()
 {
     int index = ui->tabWidget->count() - 1;
-    ui->tabWidget->insertTab(index, last_page = new WebPage(WebPage::UsualPrivacy, this), QString());
+    ui->tabWidget->insertTab(index, last_page = new WebPage(SettingsPage::UsualPrivacy, this), QString());
     ui->tabWidget->setCurrentIndex(index);
     ui->tabWidget->setTabIcon(index, last_page->windowIcon());
+    last_page->setMainWindow(this);
     last_page->load(QUrl("about:blank"));
 
     connect(last_page, SIGNAL(newWindowLink(QUrl)), this, SLOT(newWindowLink(QUrl)));
@@ -121,9 +122,10 @@ void MainWindow::on_actionAddTab_triggered()
 void MainWindow::on_actionAddIncognitoTab_triggered()
 {
     int index = ui->tabWidget->count() - 1;
-    ui->tabWidget->insertTab(index, last_page = new WebPage(WebPage::IncognitoPrivacy, this), QString());
+    ui->tabWidget->insertTab(index, last_page = new WebPage(SettingsPage::IncognitoPrivacy, this), QString());
     ui->tabWidget->setCurrentIndex(index);
     ui->tabWidget->setTabIcon(index, last_page->windowIcon());
+    last_page->setMainWindow(this);
     last_page->load(QUrl("about:blank"));
 
     connect(last_page, SIGNAL(newWindowLink(QUrl)), this, SLOT(newWindowLink(QUrl)));
@@ -151,25 +153,38 @@ void MainWindow::on_tabWidget_tabCloseRequested(int index)
     }
     w->deleteLater();
 
-    ui->tabWidget->setCurrentIndex(qMax(index - 1, 0));
+    if (index == ui->tabWidget->count() - 1)
+    {
+        ui->tabWidget->setCurrentIndex(qMax(index - 1, 0));
+    }
+}
+
+void MainWindow::newWindow(SettingsPage::Privacy p)
+{
+    switch (p)
+    {
+    case SettingsPage::UsualPrivacy:
+        ui->actionAddTab->trigger();
+        break;
+    case SettingsPage::IncognitoPrivacy:
+        ui->actionAddIncognitoTab->trigger();
+        break;
+    }
 }
 
 void MainWindow::newWindowLink(QUrl url)
 {
-    bool incognito = false;
-    if (WebPage * webpage = dynamic_cast<WebPage *>(sender()))
+    if (last_page == 0)
     {
-        incognito = webpage->isIncognito();
-    }
-    if (!incognito)
-    {
-        ui->actionAddTab->trigger();
-    }
-    else
-    {
-        ui->actionAddIncognitoTab->trigger();
+        SettingsPage::Privacy privacy = SettingsPage::UsualPrivacy;
+        if (WebPage * webpage = dynamic_cast<WebPage *>(sender()))
+        {
+            privacy = webpage->privacyMode();
+        }
+        newWindow(privacy);
     }
     last_page->load(url);
+    last_page = 0;
 }
 
 void MainWindow::linkHovered(const QString & link, const QString &, const QString &)
@@ -294,7 +309,7 @@ void MainWindow::saveLastPages()
     {
         if (WebPage * webpage = dynamic_cast<WebPage *>(ui->tabWidget->widget(i)))
         {
-            if (!webpage->isIncognito())
+            if (webpage->privacyMode() == SettingsPage::UsualPrivacy)
             {
                 QString url = webpage->view()->url().toString();
                 if (!url.isEmpty())
@@ -331,6 +346,8 @@ void MainWindow::tabCustomContextMenuRequested(const QPoint &pos)
     QMenu menu;
     if (WebPage * webpage = dynamic_cast<WebPage *>(ui->tabWidget->widget(ui->tabWidget->currentIndex())))
     {
+        menu.addAction(ui->actionCloseAllOtherTabs);
+        menu.addSeparator();
         menu.addAction(ui->actionSavePage);
         menu.addAction(ui->actionDownloadPage);
         menu.addAction(ui->actionInspectPage);
@@ -377,4 +394,22 @@ void MainWindow::on_actionInspectPage_triggered()
     {
         webpage->inspectCurrentElement();
     }
+}
+
+void MainWindow::on_actionCloseAllOtherTabs_triggered()
+{
+    setUpdatesEnabled(false);
+    QWidget * current = ui->tabWidget->currentWidget();
+    while (ui->tabWidget->count() > 2)
+    {
+        if (ui->tabWidget->widget(0) != current)
+        {
+            ui->tabWidget->tabCloseRequested(0);
+        }
+        if (ui->tabWidget->widget(ui->tabWidget->count() - 2) != current)
+        {
+            ui->tabWidget->tabCloseRequested(ui->tabWidget->count() - 2);
+        }
+    }
+    setUpdatesEnabled(true);
 }

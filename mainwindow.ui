@@ -60,7 +60,7 @@
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>26</height>
+     <height>21</height>
     </rect>
    </property>
   </widget>
@@ -150,6 +150,14 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+Shift+I</string>
+   </property>
+  </action>
+  <action name="actionCloseAllOtherTabs">
+   <property name="text">
+    <string>Close All Other Tabs</string>
+   </property>
+   <property name="toolTip">
+    <string>Close All Other Tabs</string>
    </property>
   </action>
  </widget>

@@ -10,6 +10,7 @@
 #include <QProgressDialog>
 #include <QBuffer>
 #include <QImageReader>
+#include <QtWebKit/QWebElement>
 
 struct FileManager::SavePageStruct
 {

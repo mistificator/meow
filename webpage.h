@@ -18,17 +18,17 @@ class WebPage;
 
 class FileManager;
 class DownloadManager;
+class MainWindow;
 class WebPage : public QWidget
 {
     Q_OBJECT
 
 public:
-    enum Privacy {UsualPrivacy = SettingsPage::UsualPrivacy, IncognitoPrivacy = SettingsPage::IncognitoPrivacy};
-    explicit WebPage(Privacy _privacy = UsualPrivacy, QWidget *parent = 0);
+    explicit WebPage(SettingsPage::Privacy _privacy = SettingsPage::UsualPrivacy, QWidget *parent = 0);
     ~WebPage();
     QWebView * view() const;
     QWebPage * page() const;
-    bool isIncognito() const;
+    SettingsPage::Privacy privacyMode() const;
     bool isToolWindow() const;
     bool isHiddenWindow() const;
     WebPage * createToolWindow(QUrl url, QString title = "", Qt::ConnectionType conn = Qt::QueuedConnection) const;
@@ -38,6 +38,8 @@ public:
     QString currentAltText() const { return current_alt_text; }
     QString currentPageTitle() const { return current_page_title; }
     QPoint currentPos() const { return current_pos; }
+
+    void setMainWindow(const MainWindow * _mw);
 public slots:
     void downloadRequest(const QNetworkRequest & request);
     void runScript();
@@ -67,7 +69,6 @@ private slots:
     void actionDownloadImageToDisk();
 
     void downloadFinished(QNetworkReply *);
-    void linkClicked(QUrl);
     void initialLayoutCompleted();
     void unsupportedContent(QNetworkReply * reply);
     void redirected(const QUrl &url);
@@ -82,7 +83,7 @@ private:
     QString current_page_title;
     QString current_alt_text;
     QString last_file_name;
-    Privacy privacy;
+    SettingsPage::Privacy privacy;
     QString script;
     QWebInspector * inspector;
     QCompleter * completer;
@@ -91,6 +92,7 @@ private:
     QUrl requested_url;
     DownloadManager * dmanager;
     FileManager * fmanager;
+    MainWindow * mw;
     void drawMeowCat();
     void setIncognito();
     void applyIcon();

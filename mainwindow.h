@@ -23,12 +23,14 @@ class MainWindow : public QMainWindow
 public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
-
+public slots:
+    void newWindow(SettingsPage::Privacy);
+    void newWindowLink(QUrl);
+    WebPage * lastPage() const { return last_page; }
 private slots:
     void on_actionAddTab_triggered();
     void on_actionAddIncognitoTab_triggered();
     void on_tabWidget_tabCloseRequested(int index);
-    void newWindowLink(QUrl);
     void linkHovered(const QString & link, const QString & title, const QString & textContent);
     void showNotifier(QString, int timeout = 5000);
     void hideNotifier();
@@ -41,6 +43,8 @@ private slots:
     void on_actionDownloadPage_triggered();
     void on_actionRunScript_triggered();
     void on_actionInspectPage_triggered();
+    void on_actionCloseAllOtherTabs_triggered();
+
 private:
     Ui::MainWindow *ui;
     QString temp_dir;

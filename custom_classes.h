@@ -12,80 +12,29 @@
 #include <QFile>
 #include <QDebug>
 #include <QtWebKitWidgets/QWebFrame>
-#include <QtWebKit/QWebElement>
 #include <QApplication>
 #include <QFileInfo>
 
 #include "settingspage.h"
 #include "webpage.h"
+#include "mainwindow.h"
 
 class CustomWebPage : public QWebPage
 {
 public:
-    CustomWebPage(QObject * _parent = 0): QWebPage(_parent)
+    CustomWebPage(QObject * _parent = 0): QWebPage(_parent), mw(0)
     {
-        setLinkDelegationPolicy(QWebPage::DelegateAllLinks);
-//        setForwardUnsupportedContent(true);
+//        setLinkDelegationPolicy(QWebPage::DelegateAllLinks);
+    }
+    void setMainWindow(const MainWindow * _mw)
+    {
+        mw = (MainWindow *)_mw;
     }
 protected:    
-    virtual bool acceptNavigationRequest(QWebFrame * frame, const QNetworkRequest & request, NavigationType type)
+    virtual bool acceptNavigationRequest(QWebFrame *frame, const QNetworkRequest &request, NavigationType type)
     {
-        bool rc = QWebPage::acceptNavigationRequest(frame, request, type);
-//        qDebug() << "accept nav request" << this << view() << rc << request.url() << type;
-//        qDebug() << "accept nav request" << this << view() << type << frame;
-
-        if (view() == 0 && (property("create").toBool() && type == QWebPage::NavigationTypeOther) && property("base_view").toULongLong() != 0 && !request.url().isEmpty())
-        {
-            setProperty("create", false);
-            if (WebPage * webpage = dynamic_cast<WebPage *>(((QWebView *)property("base_view").toULongLong())->parentWidget()))
-            {
-                QMetaObject::invokeMethod(webpage, "newWindowLink", Qt::QueuedConnection, Q_ARG(QUrl, request.url())); // opens in a new tab
-            }
-        }
-        /*
-        if (view() == 0 && ((property("create").toBool() && type == QWebPage::NavigationTypeOther) || type == QWebPage::NavigationTypeFormSubmitted) && property("base_view").toULongLong() != 0)
-        {
-            setProperty("create", false);
-            if (WebPage * webpage = dynamic_cast<WebPage *>(((QWebView *)property("base_view").toULongLong())->parentWidget()))
-            {
-                WebPage * new_webpage = webpage->createToolWindow(request.url(), property("text").toString(), Qt::QueuedConnection);
-                new_webpage->page()->setProperty("base_view", property("base_view"));
-                //QMetaObject::invokeMethod(webpage, "newWindowLink", Qt::QueuedConnection, Q_ARG(QUrl, request.url())); // opens in a new tab
-
-                QMetaObject::invokeMethod(this, "deleteLater", Qt::QueuedConnection);
-            }
-        }
-        if (type == QWebPage::NavigationTypeFormSubmitted || type == QWebPage::NavigationTypeFormResubmitted)
-        {
-            if (QWebView * base_view = ((QWebView *)property("base_view").toULongLong()))
-            {
-                qDebug() << "reload base view";
-                QMetaObject::invokeMethod(base_view, "reload", Qt::QueuedConnection);
-            }
-        }
-        if (view())
-        {
-            if (WebPage * webpage = dynamic_cast<WebPage *>(view()->parentWidget()))
-            {
-                if (webpage->isToolWindow())
-                {
-                    if (type == QWebPage::NavigationTypeFormSubmitted || type == QWebPage::NavigationTypeFormResubmitted)
-                    {
-                        qDebug() << "close tool window";
-                        QMetaObject::invokeMethod(webpage, "close", Qt::QueuedConnection);
-                        QMetaObject::invokeMethod(webpage, "deleteLater", Qt::QueuedConnection);
-                    }
-                    else
-                    {
-                        qDebug() << "show tool window";
-                        webpage->show();
-                    }
-                }
-            }
-        }
-        */
-
-        return rc;
+//        qDebug() << "acceptNavigationRequest" << request.url().host();
+        return QWebPage::acceptNavigationRequest(frame, request, type);
     }
     virtual QObject * createPlugin(const QString & classid, const QUrl & url, const QStringList & paramNames, const QStringList & paramValues)
     {
@@ -94,28 +43,13 @@ protected:
     }
     virtual QWebPage * createWindow(WebWindowType type)
     {
-        QWebPage * page = QWebPage::createWindow(type);
-
-        if (page == 0 && view())
+        if (mw == 0 || view() == 0)
         {
-            QWebHitTestResult hit = currentFrame()->hitTestContent(view()->mapFromGlobal(QCursor::pos()));
-            if (hit.element().tagName().toLower() != "a" && hit.linkUrl().isEmpty())
-            {
-//                return this;
-                qDebug() << "hit test" << hit.element().tagName();
-                page = new CustomWebPage(this);
-                page->setProperty("base_view", (qulonglong)view());
-                page->setProperty("create", true);
-                page->setProperty("text", hit.element().toPlainText());
-                qDebug() << "create window new" << type << page;
-            }
+            return QWebPage::createWindow(type);
         }
-        else
-        {
-            qDebug() << "create window default" << type << page;
-        }
-
-        return page;
+        qDebug() << "createWindow";
+        mw->newWindow(dynamic_cast<WebPage *>(view()->parentWidget()) ? dynamic_cast<WebPage *>(view()->parentWidget())->privacyMode() : SettingsPage::UsualPrivacy);
+        return mw->lastPage()->page();
     }
     virtual void javaScriptAlert(QWebFrame * frame, const QString & msg)
     {
@@ -146,6 +80,8 @@ protected:
         }
         return str;
     }
+private:
+    MainWindow * mw;
 };
 
 class CompleterColumnDelegate: public QStyledItemDelegate
@@ -292,22 +228,7 @@ public:
         {
             if (privacy == SettingsPage::UsualPrivacy)
             {
-                QByteArray data;
-                foreach (QNetworkCookie cookie, JarOpener::allCookies(sharedJar(privacy)))
-                {
-                    if (!cookie.isSessionCookie())
-                    {
-                        data.append(cookie.toRawForm());
-                        data.append("\n");
-                    }
-                }
-                qDebug() << "write cookies to" << SettingsPage::cookieJar();
-                QFile file(SettingsPage::cookieJar());
-                if (file.open(QFile::WriteOnly))
-                {
-                    file.write(data);
-                    file.close();
-                }
+                flush();
             }
             delete refCount(privacy);
             delete sharedJar(privacy);
@@ -341,6 +262,25 @@ public:
     {
         JarOpener::setAllCookies(sharedJar(SettingsPage::UsualPrivacy), QList<QNetworkCookie>());
         JarOpener::setAllCookies(sharedJar(SettingsPage::IncognitoPrivacy), QList<QNetworkCookie>());
+    }
+    static void flush()
+    {
+        QByteArray data;
+        foreach (QNetworkCookie cookie, JarOpener::allCookies(sharedJar(SettingsPage::UsualPrivacy)))
+        {
+            if (!cookie.isSessionCookie())
+            {
+                data.append(cookie.toRawForm());
+                data.append("\n");
+            }
+        }
+        qDebug() << "write cookies to" << SettingsPage::cookieJar();
+        QFile file(SettingsPage::cookieJar());
+        if (file.open(QFile::WriteOnly))
+        {
+            file.write(data);
+            file.close();
+        }
     }
 protected:
     virtual bool validateCookie(const QNetworkCookie &cookie, const QUrl &url) const

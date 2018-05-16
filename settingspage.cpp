@@ -216,7 +216,7 @@ void SettingsPage::databaseSettingsInit(QSqlDatabase & db)
                      "google.com/search?q=%1" <<
                      "yandex.com/search/?text=%1");
     setImageSearchEngines(QStringList() <<
-                     "google.com/searchbyimage?image_url=%1" <<
+                     "www.google.com/searchbyimage?image_url=%1" <<
                      "yandex.com/images/search?rpt=imageview&url=%1");
     setTranslateEngines(QStringList() <<
                      "translate.google.ru/?hl=#auto/" + QLocale::system().bcp47Name().left(2) + "/%1");
@@ -732,7 +732,7 @@ QStringList SettingsPage::updateSearchEngines()
     for (int i = 0; i < ui->searchEngine->count(); i++)
     {
         QString url =  ui->searchEngine->itemText(i);
-        ui->searchEngine->setItemIcon(i, QWebSettings::iconForUrl(QUrl("https://" + QUrl(url).host()))); // doesn't work
+//        ui->searchEngine->setItemIcon(i, QWebSettings::iconForUrl(QUrl("https://" + QUrl(url).host()))); // doesn't work
         list << url;
     }
     return list;
@@ -744,7 +744,7 @@ QStringList SettingsPage::updateImageSearchEngines()
     for (int i = 0; i < ui->imageSearchEngine->count(); i++)
     {
         QString url =  ui->imageSearchEngine->itemText(i);
-        ui->imageSearchEngine->setItemIcon(i, QWebSettings::iconForUrl(QUrl("https://" + QUrl(url).host()))); // doesn't work
+//        ui->imageSearchEngine->setItemIcon(i, QWebSettings::iconForUrl(QUrl("https://" + QUrl(url).host()))); // doesn't work
         list << url;
     }
     return list;
@@ -756,7 +756,7 @@ QStringList SettingsPage::updateTranslateEngines()
     for (int i = 0; i < ui->translateEngine->count(); i++)
     {
         QString url =  ui->translateEngine->itemText(i);
-        ui->translateEngine->setItemIcon(i, QWebSettings::iconForUrl(QUrl("https://" + QUrl(url).host()))); // doesn't work
+//        ui->translateEngine->setItemIcon(i, QWebSettings::iconForUrl(QUrl("https://" + QUrl(url).host()))); // doesn't work
         list << url;
     }
     return list;

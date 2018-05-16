@@ -9,7 +9,6 @@
 #include <QNetworkRequest>
 #include <QDebug>
 #include <QNetworkProxy>
-#include <QtWebKit/QWebElement>
 #include <QImageReader>
 #include <QBuffer>
 #include <QTableView>
@@ -18,6 +17,7 @@
 #include <QInputDialog>
 #include <QStandardPaths>
 #include <QProgressDialog>
+#include <QtWebKit/QWebElement>
 
 #include "mainwindow.h"
 #include "tabbar.h"
@@ -27,19 +27,19 @@
 #include "downloadmanager.h"
 #include "filemanager.h"
 
-WebPage::WebPage(Privacy _privacy, QWidget *parent) :
+WebPage::WebPage(SettingsPage::Privacy _privacy, QWidget *parent) :
     QWidget(parent),
     ui(new Ui::WebPage),
     privacy(_privacy),
     script("// sample script\r\ndocument.title = \"This is the new page title.\";"),
     tool_window(false),
-    temporary(false)
+    temporary(false),
+    mw(0)
 {
     ui->setupUi(this);
 
     view()->setPage(new CustomWebPage());
 
-    connect(page(), SIGNAL(linkClicked(QUrl)), this, SLOT(linkClicked(QUrl)));
     connect(page(), SIGNAL(linkHovered(QString,QString,QString)), this, SIGNAL(linkHovered(QString,QString,QString)));
     connect(page()->mainFrame(), SIGNAL(initialLayoutCompleted()), this, SLOT(initialLayoutCompleted()));
     connect(page(), SIGNAL(downloadRequested(QNetworkRequest)), this, SLOT(downloadRequest(QNetworkRequest)));
@@ -105,7 +105,7 @@ WebPage::WebPage(Privacy _privacy, QWidget *parent) :
     tv->setItemDelegateForColumn(SettingsPage::completerHistoryModel()->fieldIndex("Description"), new CompleterColumnDelegate());
     ui->webAddress->setCompleter(completer);
 
-    if (privacy == IncognitoPrivacy)
+    if (privacy == SettingsPage::IncognitoPrivacy)
     {
         setIncognito();
     }
@@ -128,12 +128,23 @@ WebPage::WebPage(Privacy _privacy, QWidget *parent) :
 
 WebPage::~WebPage()
 {
+//    qDebug() << "dtor webpage";
     if (dmanager->currentReply() && dmanager->currentReply()->isRunning())
     {
         connect(dmanager, SIGNAL(downloadFinished(QNetworkReply*)), dmanager, SLOT(deleteLater()), Qt::QueuedConnection);
     }
+    dmanager->setCookieJar(new QNetworkCookieJar()); // force prev jar dtor calling
     page()->networkAccessManager()->setCookieJar(new QNetworkCookieJar()); // force prev jar dtor calling
     delete ui;
+}
+
+void WebPage::setMainWindow(const MainWindow * _mw)
+{
+    if (CustomWebPage * custom_page = dynamic_cast<CustomWebPage *>(page()))
+    {
+        custom_page->setMainWindow(_mw);
+    }
+    mw = (MainWindow *)_mw;
 }
 
 QWebView * WebPage::view() const
@@ -148,6 +159,8 @@ QWebPage * WebPage::page() const
 
 void WebPage::load(const QUrl & url)
 {
+//    qDebug() << "load" << url;
+
     Meow::waitEventsProcessing(); // hack
     view()->load(CustomNetworkRequest(url));
 }
@@ -164,13 +177,14 @@ void WebPage::on_actionLoadPage_triggered()
             if (!search_engine.isEmpty())
             {
                 updateCompleter(url_copy.toString(QUrl::RemoveScheme | QUrl::RemovePort), "");
+                url = search_engine;
             }
             else
             {
                 url = "0.0.0.0";
             }
         }
-        if ((privacy == IncognitoPrivacy && url.scheme().compare("http", Qt::CaseInsensitive) == 0) || url.scheme().isEmpty())
+        if ((privacy == SettingsPage::IncognitoPrivacy && url.scheme().compare("http", Qt::CaseInsensitive) == 0) || url.scheme().isEmpty())
         {
             url.setScheme("https");
         }
@@ -215,7 +229,7 @@ void WebPage::drawMeowCat()
     if (current_url.toString().trimmed().compare("about:blank", Qt::CaseInsensitive) == 0) // draw cat
     {
         QStringList div_style = QStringList() << "position: absolute" << "top: 0" << "bottom: 0" << "left: 0" << "right: 0" << "margin: auto" << "width: 30%" << "height: 30%";
-        if (!isIncognito())
+        if (privacy == SettingsPage::UsualPrivacy)
         {
             div_style << "opacity: 0.1";
         }
@@ -283,7 +297,7 @@ void WebPage::on_webView_loadStarted()
 
 void WebPage::applyIcon()
 {
-    if (isIncognito())
+    if (privacy == SettingsPage::IncognitoPrivacy)
     {
         return;
     }
@@ -345,26 +359,16 @@ QWebHitTestResult WebPage::hitTest(QPoint pos) const
     return view()->page()->mainFrame()->hitTestContent(pos);
 }
 
-void WebPage::linkClicked(QUrl url)
-{
-    current_pos = view()->mapFromGlobal(QCursor::pos());
-    view()->pageAction(QWebPage::OpenLink)->trigger();
-}
-
 void WebPage::actionOpenLink()
 {
     QWebHitTestResult hit_test = hitTest(current_pos);
     QUrl url = hit_test.linkUrl();
     if (!url.isEmpty() && url.isValid())
     {
-        QWebElement element = hit_test.element();
-        while (!element.isNull() && element.tagName().compare("a", Qt::CaseInsensitive) != 0)
+        qDebug() << "actionOpenLink" << url;
+        if (mw && mw->lastPage())
         {
-            element = element.parent();
-        }
-        if (element.attribute("target").contains("blank", Qt::CaseInsensitive))
-        {
-            emit newWindowLink(url);
+            mw->lastPage()->load(url);
         }
         else
         {
@@ -449,7 +453,7 @@ void WebPage::redirected(const QUrl & url)
 
 void WebPage::updateCompleter(QString phrase, QString desc)
 {
-    if (!isIncognito())
+    if (privacy == SettingsPage::UsualPrivacy)
     {
         if (!phrase.isEmpty())
         {
@@ -524,9 +528,9 @@ void WebPage::setIncognito()
     settings->setThirdPartyCookiePolicy(QWebSettings::AlwaysBlockThirdPartyCookies);
 }
 
-bool WebPage::isIncognito() const
+SettingsPage::Privacy WebPage::privacyMode() const
 {
-    return privacy == IncognitoPrivacy;
+    return privacy;
 }
 
 bool WebPage::isToolWindow() const
@@ -541,7 +545,7 @@ bool WebPage::isHiddenWindow() const
 
 WebPage * WebPage::createToolWindow(QUrl url, QString title, Qt::ConnectionType conn) const
 {
-    WebPage * new_webpage = new WebPage(privacy, topLevelWidget());
+    WebPage * new_webpage = new WebPage(privacy, const_cast<WebPage *>(this));
     new_webpage->setWindowTitle(title);
     new_webpage->setWindowFlags(Qt::CustomizeWindowHint | Qt::Tool | Qt::WindowCloseButtonHint | Qt::WindowTitleHint);
     for (int i = 0; i < new_webpage->ui->horizontalLayout->count(); i++)
