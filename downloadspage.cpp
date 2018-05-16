@@ -1,6 +1,7 @@
 #include "downloadspage.h"
 #include "ui_downloadspage.h"
 #include "settingspage.h"
+#include "custom_classes.h"
 
 #include <QDesktopServices>
 #include <QStyledItemDelegate>
@@ -9,8 +10,6 @@
 #include <QFileInfo>
 #include <QMessageBox>
 #include <QProcess>
-
-#include "custom_classes.h"
 
 DownloadsPage::DownloadsPage(QWidget *parent) :
     QWidget(parent),
@@ -50,6 +49,61 @@ DownloadsPage::~DownloadsPage()
     delete ui;
 }
 
+#ifdef __linux__
+
+#include <QSettings>
+namespace Utils
+{
+namespace UnixUtils
+{
+
+QString defaultFileBrowser()
+{
+    return QLatin1String("xdg-open %d");
+}
+
+QString fileBrowser(const QSettings *settings = 0)
+{
+    const QString dflt = defaultFileBrowser();
+    if (!settings)
+        return dflt;
+    return settings->value(QLatin1String("General/FileBrowser"), dflt).toString();
+}
+
+QString substituteFileBrowserParameters(const QString &pre, const QString &file)
+{
+    QString cmd;
+    for (int i = 0; i < pre.size(); ++i) {
+        QChar c = pre.at(i);
+        if (c == QLatin1Char('%') && i < pre.size()-1) {
+            c = pre.at(++i);
+            QString s;
+            if (c == QLatin1Char('d')) {
+                s = QLatin1Char('"') + QFileInfo(file).path() + QLatin1Char('"');
+            } else if (c == QLatin1Char('f')) {
+                s = QLatin1Char('"') + file + QLatin1Char('"');
+            } else if (c == QLatin1Char('n')) {
+                s = QLatin1Char('"') + QFileInfo(file).fileName() + QLatin1Char('"');
+            } else if (c == QLatin1Char('%')) {
+                s = c;
+            } else {
+                s = QLatin1Char('%');
+                s += c;
+            }
+            cmd += s;
+            continue;
+
+        }
+        cmd += c;
+    }
+
+    return cmd;
+}
+
+}
+}
+#endif
+
 void DownloadsPage::on_openFolder_clicked()
 {
     QString pathIn = SettingsPage::downloadsHistoryModel()->index(ui->downloadsTable->currentIndex().row(), SettingsPage::downloadsHistoryModel()->fieldIndex("File")).data().toString();
@@ -79,16 +133,17 @@ void DownloadsPage::on_openFolder_clicked()
         // we cannot select a file here, because no file browser really supports it...
         const QFileInfo fileInfo(pathIn);
         const QString folder = fileInfo.absoluteFilePath();
-        const QString app = Utils::UnixUtils::fileBrowser(Core::ICore::instance()->settings());
+        const QString app = Utils::UnixUtils::fileBrowser();
         QProcess browserProc;
         const QString browserArgs = Utils::UnixUtils::substituteFileBrowserParameters(app, folder);
-        if (debug)
-            qDebug() <<  browserArgs;
+        qDebug() <<  browserArgs;
         bool success = browserProc.startDetached(browserArgs);
         const QString error = QString::fromLocal8Bit(browserProc.readAllStandardError());
         success = success && error.isEmpty();
         if (!success)
-            showGraphicalShellError(parent, app, error);
+        {
+            qDebug() << "on_openFolder_clicked" << app << error;
+        }
     #endif
     }
 

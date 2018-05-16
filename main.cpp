@@ -19,9 +19,12 @@ int main(int argc, char *argv[])
     QSharedMemory shmem("meow_single");
     if (!shmem.create(1))
     {
+        shmem.attach();
         qDebug() << "already running";
+        shmem.detach();
         return 0;
     }
+    shmem.attach();
 
 #if defined(Q_OS_WIN) && defined(_DEBUG)
     WTFSetCrashHookFunction WTFSetCrashHook = (WTFSetCrashHookFunction)QLibrary::resolve("Qt5WebKitd", "WTFSetCrashHook");
@@ -44,4 +47,8 @@ int main(int argc, char *argv[])
     int code = a.exec();
 
     SettingsPage::setItWasSuccessExit(code == 0);
+
+    shmem.detach();
+
+    return 0;
 }

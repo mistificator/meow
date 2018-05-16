@@ -11,8 +11,7 @@ CONFIG -= debug_and_release
 QT       += core gui widgets network svg sql
 
 unix: QT += webkit webkitwidgets
-win32:
-{
+win32: {
     QT_LIB_PATH = $$[QT_INSTALL_LIBS]
     CONFIG(debug, debug|release) {
         LIBS += $$QT_LIB_PATH/Qt5WebKitd.lib $$QT_LIB_PATH/Qt5WebKitWidgetsd.lib

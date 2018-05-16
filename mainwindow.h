@@ -7,6 +7,7 @@
 #include <QLabel>
 #include <QTimer>
 #include <QScrollArea>
+#include <QToolButton>
 #include "webpage.h"
 #include "settingspage.h"
 #include "downloadspage.h"

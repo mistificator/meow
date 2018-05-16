@@ -1,5 +1,7 @@
 #include "filemetadata.h"
-//#include <QImageReader>
+
+#ifdef __WIN32__
+
 #include <QDebug>
 #include <QFileInfo>
 
@@ -95,7 +97,6 @@ FileMetadata::~FileMetadata()
 bool FileMetadata::setImage(QString filename)
 {
     d->filename = filename;
-//    d->format = "image/" + QImageReader(filename).format().toLower().replace("jpg", "jpeg");
     d->format = Meow::contentTypeForSuffix(QFileInfo(filename).suffix());
     // Get the CLSID of encoder.
     d->image_set_up = Data::GetEncoderClsid((wchar_t *)d->format.utf16(), &d->clsid) >= 0;
@@ -156,3 +157,31 @@ bool FileMetadata::setField(int tag, QString value)
     }
     return stat == Ok;
 }
+
+#endif
+
+#ifdef __linux__
+
+// TODO: use libexif there
+
+FileMetadata::FileMetadata()
+{
+
+}
+
+FileMetadata::~FileMetadata()
+{
+
+}
+
+bool FileMetadata::setImage(QString filename)
+{
+    return false;
+}
+
+bool FileMetadata::setField(int tag, QString value)
+{
+    return false;
+}
+
+#endif
