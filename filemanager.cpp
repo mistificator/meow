@@ -302,8 +302,8 @@ QString FileManager::parseCssBgImageUrl(const QString & css, int & start, int & 
 QString FileManager::savePageElement(QString tag, QString attr, QString value)
 {
     if (!webpage || value.isEmpty() ||
-            (tag.compare("img", Qt::CaseInsensitive) == 0 && value.endsWith(".ico", Qt::CaseInsensitive)) ||
-            (tag.compare("a", Qt::CaseInsensitive) == 0 && value == "#"))
+//            (tag.compare("img", Qt::CaseInsensitive) == 0 && value.endsWith(".ico", Qt::CaseInsensitive)) ||
+            (tag.compare("a", Qt::CaseInsensitive) == 0 && !QUrl(value).isValid()))
     {
         return QString();
     }
@@ -332,8 +332,10 @@ QString FileManager::savePageElement(QString tag, QString attr, QString value)
     }
     qDebug() << tag << attr << value << url;
     QEventLoop loop;
+    QTimer timer;
     connect(webpage, SIGNAL(downloadFinished()), & loop, SLOT(quit()));
     webpage->downloadRequest(CustomNetworkRequest(url));
+    timer.singleShot(30000, & loop, SLOT(quit()));
     loop.exec();
     QDir().mkpath(QFileInfo(last_file_name).absolutePath());
     return QDir(save_page->path()).relativeFilePath(last_file_name);
@@ -369,6 +371,7 @@ void FileManager::savePage()
     local_page->disconnect(this);
     local_page->page()->settings()->setAttribute(QWebSettings::JavascriptEnabled, false);
 
+    /*
     // download html
     {
         QEventLoop loop;
@@ -389,6 +392,11 @@ void FileManager::savePage()
         file.close();
         QFile::remove(last_file_name);
     }
+    */
+
+    // no loading, just setting html
+    local_page->view()->setHtml(webpage->page()->mainFrame()->toHtml());
+    local_page->view()->stop();
 
     save_page->switchRelative();
 
@@ -414,6 +422,8 @@ void FileManager::savePage()
     map.insertMulti("style", list); count += list.count();
     list = document.findAll("span").toList();
     map.insertMulti("style", list); count += list.count();
+    list = document.findAll("iframe").toList();
+    map.insertMulti("src", list); count += list.count();
     progress->setMaximum(0);
     progress->setWindowModality(Qt::NonModal);
 

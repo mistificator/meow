@@ -40,6 +40,8 @@ WebPage::WebPage(SettingsPage::Privacy _privacy, QWidget *parent) :
 
     view()->setPage(new CustomWebPage());
 
+    page()->setNetworkAccessManager(new CustomNetworkAccessManager(this));
+
     connect(page(), SIGNAL(linkHovered(QString,QString,QString)), this, SIGNAL(linkHovered(QString,QString,QString)));
     connect(page()->mainFrame(), SIGNAL(initialLayoutCompleted()), this, SLOT(initialLayoutCompleted()));
     connect(page(), SIGNAL(downloadRequested(QNetworkRequest)), this, SLOT(downloadRequest(QNetworkRequest)));

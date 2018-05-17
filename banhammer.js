@@ -58,7 +58,8 @@ var url_filters =
 	"click.",
 	"clicks.",
 	"refer.",
-	"advert"
+	"advert",
+	"yadro.ru"
 ];
 
 var keyword_filters =
@@ -98,7 +99,8 @@ var keyword_filters =
 	"mailru",
 //	"counter",
 	"reklama",
-	"adhiding"
+	"adhiding",
+	"mgbox"
 ];
 
 var style_exception_filters =

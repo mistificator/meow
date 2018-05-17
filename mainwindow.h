@@ -25,7 +25,7 @@ public:
     explicit MainWindow(QWidget *parent = 0);
     ~MainWindow();
 public slots:
-    void newWindow(SettingsPage::Privacy);
+    void newWindow(SettingsPage::Privacy privacy = SettingsPage::UsualPrivacy);
     void newWindowLink(QUrl);
     WebPage * lastPage() const { return last_page; }
 private slots:

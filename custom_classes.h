@@ -84,6 +84,23 @@ private:
     MainWindow * mw;
 };
 
+class CustomNetworkAccessManager: public QNetworkAccessManager
+{
+public:
+    CustomNetworkAccessManager(QObject * _parent = 0): QNetworkAccessManager(_parent) {}
+protected:
+    QNetworkReply * createRequest(Operation op, const QNetworkRequest &originalReq, QIODevice *outgoingData = Q_NULLPTR)
+    {
+        QNetworkRequest req = originalReq;
+        if (req.url().isLocalFile() && !req.url().host().isEmpty())
+        {
+            qDebug() << "skip request" << req.url();
+            req = QNetworkRequest();
+        }
+        return QNetworkAccessManager::createRequest(op, req, outgoingData);
+    }
+};
+
 class CompleterColumnDelegate: public QStyledItemDelegate
 {
 public:

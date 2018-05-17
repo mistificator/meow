@@ -30,7 +30,7 @@ MainWindow::MainWindow(QWidget *parent) :
     QWebSettings::globalSettings()->setAttribute(QWebSettings::JavascriptCanOpenWindows, true);
     QWebSettings::globalSettings()->setAttribute(QWebSettings::JavascriptCanCloseWindows, true);
 //    QWebSettings::globalSettings()->setAttribute(QWebSettings::WebSecurityEnabled, false);
-//    QWebSettings::globalSettings()->setAttribute(QWebSettings::AllowRunningInsecureContent, false);
+//    QWebSettings::globalSettings()->setAttribute(QWebSettings::AllowRunningInsecureContent, true);
 //    QWebSettings::globalSettings()->setAttribute(QWebSettings::LocalContentCanAccessRemoteUrls, true);
 //    QWebSettings::globalSettings()->setAttribute(QWebSettings::LocalContentCanAccessFileUrls, true);
 //    QWebSettings::globalSettings()->setAttribute(QWebSettings::DnsPrefetchEnabled, true);
@@ -157,6 +157,8 @@ void MainWindow::on_tabWidget_tabCloseRequested(int index)
     {
         ui->tabWidget->setCurrentIndex(qMax(index - 1, 0));
     }
+
+    last_page = 0;
 }
 
 void MainWindow::newWindow(SettingsPage::Privacy p)
