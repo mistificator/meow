@@ -63,6 +63,8 @@ var url_filters =
 
 var keyword_filters =
 [
+    "$movie_player", // youtube
+
 	"advert",
 	"bn_",
 	"_adtune",
@@ -112,13 +114,24 @@ var ads_count = 0;
 var total_ads_count = 0;
 var total_blocking_time = 0;
 
+var skip_filters = false;
+
 function checkContains(ad, filter)
 {
+	if (filter.charAt(0) == '$')
+	{
+		filter = filter.substr(1);
+        if (ad.toLowerCase().indexOf(filter) > -1)
+        {
+            skip_filters = true;
+            return false;
+        }
+    }
 	if (filter.charAt(0) == '!')
 	{
 		filter = filter.substr(1);
 		return ad.toLowerCase().indexOf(filter) == 0 || ad.toLowerCase().indexOf(" " + filter) > -1;
-	}	
+	}
 	if (filter.charAt(filter.length - 1) == '!')
 	{
 		filter = filter.substr(0, filter.length - 1);
@@ -171,7 +184,8 @@ function checkUrlInText(ad, url_filter)
 
 function blockAd_a(ad)
 {
-    for (j = 0; j < url_filters.length; j++)
+    skip_filters = false;
+    for (j = 0; j < url_filters.length && !skip_filters; j++)
     {
         if (checkContains(ad.href, url_filters[j]))
         {
@@ -181,7 +195,7 @@ function blockAd_a(ad)
             return;
         }
     }
-    for (j = 0; j < keyword_filters.length; j++)
+    for (j = 0; j < keyword_filters.length && !skip_filters; j++)
     {
 		if (checkKeywordInIdClass(ad, keyword_filters[j]))
         {
@@ -214,7 +228,8 @@ function blockAd_a(ad)
 
 function blockAd_frame(ad)
 {
-    for (j = 0; j < url_filters.length; j++)
+    skip_filters = false;
+    for (j = 0; j < url_filters.length && !skip_filters; j++)
     {
         if (checkUrlInSrcName(ad, url_filters[j]))
         {
@@ -235,7 +250,8 @@ function blockAd_frame(ad)
 
 function blockAd_div(ad)
 {
-    for (j = 0; j < keyword_filters.length; j++)
+    skip_filters = false;
+    for (j = 0; j < keyword_filters.length && !skip_filters; j++)
     {
 		if (checkKeywordInIdClass(ad, keyword_filters[j]))
         {
@@ -268,7 +284,8 @@ function blockAd_div(ad)
 
 function blockAd_script(ad)
 {
-    for (j = 0; j < keyword_filters.length; j++)
+    skip_filters = false;
+    for (j = 0; j < keyword_filters.length && !skip_filters; j++)
     {
 		if (checkUrlInSrc(ad, keyword_filters[j]) || checkKeywordInIdClass(ad, keyword_filters[j]))
         {
@@ -284,7 +301,7 @@ function blockAd_script(ad)
             return;
         }
     }
-    for (j = 0; j < url_filters.length; j++)
+    for (j = 0; j < url_filters.length && !skip_filters; j++)
     {
         if (checkUrlInSrc(ad, url_filters[j]) || checkUrlInText(ad, url_filters[j]))
         {
@@ -298,7 +315,8 @@ function blockAd_script(ad)
 
 function blockAd_style(ad)
 {
-    for (j = 0; j < url_filters.length; j++)
+    skip_filters = false;
+    for (j = 0; j < url_filters.length && !skip_filters; j++)
     {
         if (checkUrlInText(ad, url_filters[j]))
         {
