@@ -604,10 +604,37 @@ void WebPage::savePage()
 
 void WebPage::on_actionTranslateSelected_triggered()
 {
+    QString text;
+    if (ui->webAddress->hasFocus())
+    {
+        text = ui->webAddress->selectedText();
+    }
+    else
     if (!page()->selectedText().isEmpty())
     {
-        QString translate_url = SettingsPage::currentTranslateEngineUrl().arg(page()->selectedText());
+        text = page()->selectedText();
+    }
+    if (!text.isEmpty())
+    {
+        QString translate_url = SettingsPage::currentTranslateEngineUrl().arg(text);
         qDebug() << "translate url" << translate_url;
         emit newWindowLink(QUrl(translate_url));
     }
 }
+
+void WebPage::on_webAddress_customContextMenuRequested(const QPoint &pos)
+{
+    QMenu * menu = ui->webAddress->createStandardContextMenu();
+    if (!ui->webAddress->selectedText().isEmpty())
+    {
+        menu->insertSeparator(menu->actions().front());
+        menu->insertAction(menu->actions().front(), ui->actionTranslateSelected);
+    }
+    menu->exec(mapToGlobal(pos));
+}
+
+bool WebPage::eventFilter(QObject *watched, QEvent *event)
+{
+    return QWidget::eventFilter(watched, event);
+}
+

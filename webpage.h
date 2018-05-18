@@ -76,6 +76,8 @@ private slots:
     void frameCreated(QWebFrame * frame);
 
     void updownProgress(qint64 processed, qint64 total);
+    void on_webAddress_customContextMenuRequested(const QPoint &pos);
+
 private:
     Ui::WebPage *ui;
     QUrl current_url;
@@ -102,6 +104,7 @@ private:
     void updateCompleter(QString, QString);
 protected:
     void showEvent(QShowEvent *);
+    bool eventFilter(QObject *watched, QEvent *event);
 signals:
     void newWindowLink(QUrl);
     void linkHovered(const QString & link, const QString & title, const QString & textContent);

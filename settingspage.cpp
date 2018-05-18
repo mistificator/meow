@@ -219,7 +219,7 @@ void SettingsPage::databaseSettingsInit(QSqlDatabase & db)
                      "www.google.com/searchbyimage?image_url=%1" <<
                      "yandex.com/images/search?rpt=imageview&url=%1");
     setTranslateEngines(QStringList() <<
-                     "translate.google.ru/?hl=#auto/" + QLocale::system().bcp47Name().left(2) + "/%1");
+                     "translate.google.com/?hl=#auto/" + QLocale::system().bcp47Name().left(2) + "/%1");
     QString download_location;
 #if QT_VERSION >= 0x050000
     QStringList list = QStandardPaths::standardLocations(QStandardPaths::DownloadLocation);

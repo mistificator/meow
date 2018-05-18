@@ -96,6 +96,7 @@ MainWindow::MainWindow(QWidget *parent) :
         openLastPages();
         break;
     }
+    last_page = 0;
 }
 
 MainWindow::~MainWindow()
