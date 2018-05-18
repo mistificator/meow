@@ -60,7 +60,8 @@ var url_filters =
   "refer.",
   "advert",
   "yadro.ru",
-  "/clickad?"
+  "/clickad?",
+  "/banners.php?"
 ];
 
 var keyword_filters =
@@ -101,8 +102,7 @@ var keyword_filters =
 //	"counter",
 	"reklama",
 	"adhiding",
-	"mgbox",
-    "adcontent"
+	"mgbox"
 ];
 
 var style_exception_filters =
@@ -293,7 +293,13 @@ function blockAd_script(ad)
     {
 		if (checkUrlInSrc(ad, keyword_filters[j]) || checkKeywordInIdClass(ad, keyword_filters[j]))
         {
-            console.log("BanHammer: script " + ad.src + " " + ad.id + " " + ad.className + " filter " + keyword_filters[j]);		
+            console.log("BanHammer: script " + ad.src + " " + ad.id + " " + ad.className + " filter " + keyword_filters[j]);
+/*
+			if (ad.parentNode.tagName.toLowerCase() != "body" && ad.parentNode.tagName.toLowerCase() != "head")				
+			{
+				ad = ad.parentNode;
+			}
+*/			
             ad.remove();
             ads_count++;
             return;
