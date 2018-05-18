@@ -293,13 +293,7 @@ function blockAd_script(ad)
     {
 		if (checkUrlInSrc(ad, keyword_filters[j]) || checkKeywordInIdClass(ad, keyword_filters[j]))
         {
-            console.log("BanHammer: script " + ad.src + " " + ad.id + " " + ad.className + " filter " + keyword_filters[j]);
-/*
-			if (ad.parentNode.tagName.toLowerCase() != "body" && ad.parentNode.tagName.toLowerCase() != "head")				
-			{
-				ad = ad.parentNode;
-			}
-*/			
+            console.log("BanHammer: script " + ad.src + " " + ad.id + " " + ad.className + " filter " + keyword_filters[j]);	
             ad.remove();
             ads_count++;
             return;
