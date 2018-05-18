@@ -10,61 +10,62 @@
 
 var url_filters =
 [
-	".ru/click",
-	".com/click",
-    "an.yandex.",
-    "direct.yandex.",
-    "awaps.yandex.",
-    "yastatic.net",
-	".yandex.ru/count",
-    "banner.rbc.ru",
-    "medialand.ru",
-	"adx.com.ru",
-	"ssp.rambler.ru",
-	"dsp-rambler.ru",
-	"dsp.rambler.ru",
-	"recreativ.ru",
-	".everesttech.net",
-	".rubiconproject.com",
-	".hybrid.ai",
-	"googletagmanager.com",
-    ".doubleclick.net",
-    "partner.googleadservices.com",
-    ".googlesyndication.com",
-    ".google-analytics.com",
-    "creative.ak.fbcdn.net",
-    ".adbrite.com",
-    ".exponential.com",
-    ".quantserve.com",
-    ".scorecardresearch.com",
-    ".zedo.com",
-    "banana.plurk.com",
-    "ads.simplepath.com",
-    "exoclick.com",
-	"mrelko.com",
-	"trafficfactory.biz",
-	"leokross.com",
-	"fer-ta.com",
-	"advert",
-	"adfox",
-	"bingads.com",
-	"adnxs.com",
-	"reklama",
-	"!ad.",
-	"tns-counter.",
-	"radar.imgsmail.ru",
-	"adnium.com",
-	"traffichaus.com",
-	"click.",
-	"clicks.",
-	"refer.",
-	"advert",
-	"yadro.ru"
+  ".ru/click",
+  ".com/click",
+  "an.yandex.",
+  "direct.yandex.",
+  "awaps.yandex.",
+  "yastatic.net",
+  ".yandex.ru/count",
+  "banner.rbc.ru",
+  "medialand.ru",
+  "adx.com.ru",
+  "ssp.rambler.ru",
+  "dsp-rambler.ru",
+  "dsp.rambler.ru",
+  "recreativ.ru",
+  ".everesttech.net",
+  ".rubiconproject.com",
+  ".hybrid.ai",
+  "googletagmanager.com",
+  ".doubleclick.net",
+  ".googleadservices.com",
+  ".googlesyndication.com",
+  ".google-analytics.com",
+  "creative.ak.fbcdn.net",
+  ".adbrite.com",
+  ".exponential.com",
+  ".quantserve.com",
+  ".scorecardresearch.com",
+  ".zedo.com",
+  "banana.plurk.com",
+  "ads.simplepath.com",
+  "exoclick.com",
+  "mrelko.com",
+  "trafficfactory.biz",
+  "leokross.com",
+  "fer-ta.com",
+  "advert",
+  "adfox",
+  "bingads.com",
+  "adnxs.com",
+  "reklama",
+  "!ad.",
+  "tns-counter.",
+  "radar.imgsmail.ru",
+  "adnium.com",
+  "traffichaus.com",
+  "click.",
+  "clicks.",
+  "refer.",
+  "advert",
+  "yadro.ru",
+  "/clickad?"
 ];
 
 var keyword_filters =
 [
-    "$movie_player", // youtube
+  "$movie_player", // youtube
 
 	"advert",
 	"bn_",
@@ -100,7 +101,8 @@ var keyword_filters =
 //	"counter",
 	"reklama",
 	"adhiding",
-	"mgbox"
+	"mgbox",
+    "adcontent"
 ];
 
 var style_exception_filters =
@@ -291,13 +293,7 @@ function blockAd_script(ad)
     {
 		if (checkUrlInSrc(ad, keyword_filters[j]) || checkKeywordInIdClass(ad, keyword_filters[j]))
         {
-            console.log("BanHammer: script " + ad.src + " " + ad.id + " " + ad.className + " filter " + keyword_filters[j]);
-/*
-			if (ad.parentNode.tagName.toLowerCase() != "body" && ad.parentNode.tagName.toLowerCase() != "head")				
-			{
-				ad = ad.parentNode;
-			}
-*/			
+            console.log("BanHammer: script " + ad.src + " " + ad.id + " " + ad.className + " filter " + keyword_filters[j]);		
             ad.remove();
             ads_count++;
             return;
