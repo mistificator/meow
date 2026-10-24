@@ -61,7 +61,7 @@ struct FileMetadata::Data
             }
         }
 
-        qDebug() << "format not supported - " << QString::fromUtf16((ushort *)format);
+        qDebug() << "format not supported - " << QString::fromWCharArray(format);
 
         free(pImageCodecInfo);
         return -1;  // Failure
@@ -125,7 +125,9 @@ bool FileMetadata::setField(int tag, QString value)
     PropertyItem propertyItem;
     propertyItem.id = tag;
     propertyItem.type = Data::tagType(tag);
-    propertyItem.length = propertyItem.type == PropertyTagTypeASCII ? count + 1 : count;
+    propertyItem.length = (propertyItem.type == PropertyTagTypeASCII)
+                              ? (count + 1)
+                              : (count + sizeof(ushort)); // Включаем UTF-16 null-terminator для XP-тегов
     propertyItem.value = propertyValue;
     Status stat = GenericError;
     {

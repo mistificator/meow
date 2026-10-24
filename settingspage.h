@@ -125,7 +125,9 @@ private slots:
     void on_clearHistory_clicked();
     void on_translateRemove_clicked();
     void on_translateEngine_currentIndexChanged(int index);
+    void on_proxyAdress_editingFinished();
 private:
+    bool m_initializing = false;
     Ui::SettingsPage *ui;
     QStringList updateSearchEngines();
     QStringList updateImageSearchEngines();

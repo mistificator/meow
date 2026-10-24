@@ -4,130 +4,276 @@
 #include <QNetworkRequest>
 #include <QUrl>
 #include <QCompleter>
-#include <QtWebKitWidgets/QWebPage>
+#include <QWebEnginePage>
+#include <QWebEngineProfile>
+#include <QWebEngineCookieStore>
 #include <QStyledItemDelegate>
 #include <QtSql/QSqlTableModel>
 #include <QNetworkCookieJar>
 #include <QNetworkCookie>
 #include <QFile>
 #include <QDebug>
-#include <QtWebKitWidgets/QWebFrame>
 #include <QApplication>
 #include <QFileInfo>
+#include <QDateTime>
 
 #include "settingspage.h"
 #include "webpage.h"
 #include "mainwindow.h"
 
-class CustomWebPage : public QWebPage
+// SharedCookieJar объявляется до CustomWebPage для синхронизации с профилем
+class SharedCookieJar : public QNetworkCookieJar
 {
 public:
-    CustomWebPage(QObject * _parent = 0): QWebPage(_parent), mw(0)
+    SharedCookieJar(SettingsPage::Privacy _privacy, QObject *parent = nullptr)
+        : QNetworkCookieJar(parent), privacy(_privacy)
     {
-//        setLinkDelegationPolicy(QWebPage::DelegateAllLinks);
-    }
-    void setMainWindow(const MainWindow * _mw)
-    {
-        mw = (MainWindow *)_mw;
-    }
-protected:    
-    virtual bool acceptNavigationRequest(QWebFrame *frame, const QNetworkRequest &request, NavigationType type)
-    {
-//        qDebug() << "acceptNavigationRequest" << request.url().host();
-        return QWebPage::acceptNavigationRequest(frame, request, type);
-    }
-    virtual QObject * createPlugin(const QString & classid, const QUrl & url, const QStringList & paramNames, const QStringList & paramValues)
-    {
-        qDebug() << "create plugin" << classid << url;
-        return QWebPage::createPlugin(classid, url, paramNames, paramValues);
-    }
-    virtual QWebPage * createWindow(WebWindowType type)
-    {
-        if (mw == 0 || view() == 0)
+        if (privacy == SettingsPage::UsualPrivacy && *refCount(privacy) == 0)
         {
-            return QWebPage::createWindow(type);
+            QFile file(SettingsPage::cookieJar());
+            if (file.open(QFile::ReadOnly))
+            {
+                JarOpener::setAllCookies(sharedJar(privacy), QNetworkCookie::parseCookies(file.readAll()));
+                file.close();
+            }
         }
-        qDebug() << "createWindow";
-        mw->newWindow(dynamic_cast<WebPage *>(view()->parentWidget()) ? dynamic_cast<WebPage *>(view()->parentWidget())->privacyMode() : SettingsPage::UsualPrivacy);
-        return mw->lastPage()->page();
+        (*refCount(privacy))++;
     }
-    virtual void javaScriptAlert(QWebFrame * frame, const QString & msg)
+
+    ~SharedCookieJar() override
     {
-        qDebug() << "alert" << msg;
-        return QWebPage::javaScriptAlert(frame, msg);
+        (*refCount(privacy))--;
+        if (*refCount(privacy) <= 0)
+        {
+            if (privacy == SettingsPage::UsualPrivacy)
+            {
+                flush();
+            }
+            delete refCount(privacy);
+            delete sharedJar(privacy);
+            refCount(privacy) = nullptr;
+            sharedJar(privacy) = nullptr;
+        }
     }
-    virtual bool javaScriptConfirm(QWebFrame * frame, const QString & msg)
+
+    QList<QNetworkCookie> cookiesForUrl(const QUrl &url) const override
     {
-        qDebug() << "confirm" << msg;
-        return QWebPage::javaScriptConfirm(frame, msg);
+        return sharedJar(privacy)->cookiesForUrl(url);
     }
-    virtual void javaScriptConsoleMessage(const QString & message, int lineNumber, const QString & sourceID)
+
+    bool setCookiesFromUrl(const QList<QNetworkCookie> &cookieList, const QUrl &url) override
     {
-//        qDebug() << "log" << message << lineNumber << sourceID;
-        QWebPage::javaScriptConsoleMessage(message, lineNumber, sourceID);
+        return sharedJar(privacy)->setCookiesFromUrl(cookieList, url);
     }
-    virtual bool javaScriptPrompt(QWebFrame * frame, const QString & msg, const QString & defaultValue, QString * result)
+
+    bool deleteCookie(const QNetworkCookie &cookie) override
     {
-        qDebug() << "prompt" << msg;
-        return QWebPage::javaScriptPrompt(frame, msg, defaultValue, result);
+        return sharedJar(privacy)->deleteCookie(cookie);
     }
-    virtual QString userAgentForUrl(const QUrl &) const
+
+    bool insertCookie(const QNetworkCookie &cookie) override
+    {
+        return sharedJar(privacy)->insertCookie(cookie);
+    }
+
+    bool updateCookie(const QNetworkCookie &cookie) override
+    {
+        return sharedJar(privacy)->updateCookie(cookie);
+    }
+
+    static QList<QNetworkCookie> getAllSharedCookies(SettingsPage::Privacy p)
+    {
+        return JarOpener::allCookies(sharedJar(p));
+    }
+
+    static void clear()
+    {
+        JarOpener::setAllCookies(sharedJar(SettingsPage::UsualPrivacy), QList<QNetworkCookie>());
+        JarOpener::setAllCookies(sharedJar(SettingsPage::IncognitoPrivacy), QList<QNetworkCookie>());
+    }
+
+    static void flush()
+    {
+        QByteArray data;
+        const auto cookies = JarOpener::allCookies(sharedJar(SettingsPage::UsualPrivacy));
+        for (const QNetworkCookie &cookie : cookies)
+        {
+            if (!cookie.isSessionCookie())
+            {
+                data.append(cookie.toRawForm());
+                data.append("\n");
+            }
+        }
+        QFile file(SettingsPage::cookieJar());
+        if (file.open(QFile::WriteOnly))
+        {
+            file.write(data);
+            file.close();
+        }
+    }
+
+protected:
+    bool validateCookie(const QNetworkCookie &cookie, const QUrl &url) const override
+    {
+        return JarOpener::validateCookie(sharedJar(privacy), cookie, url);
+    }
+
+private:
+    SettingsPage::Privacy privacy;
+
+    static int *&refCount(SettingsPage::Privacy privacy)
+    {
+        static int *ref_count[2] = {nullptr, nullptr};
+        if (ref_count[privacy] == nullptr)
+        {
+            ref_count[privacy] = new int(0);
+        }
+        return ref_count[privacy];
+    }
+
+    static QNetworkCookieJar *&sharedJar(SettingsPage::Privacy privacy)
+    {
+        static QNetworkCookieJar *jar[2] = {nullptr, nullptr};
+        if (jar[privacy] == nullptr)
+        {
+            jar[privacy] = new QNetworkCookieJar();
+        }
+        return jar[privacy];
+    }
+
+    class JarOpener : public QNetworkCookieJar
+    {
+    public:
+        static QList<QNetworkCookie> allCookies(QNetworkCookieJar *jar)
+        {
+            return static_cast<JarOpener *>(jar)->QNetworkCookieJar::allCookies();
+        }
+        static bool validateCookie(QNetworkCookieJar *jar, const QNetworkCookie &cookie, const QUrl &url)
+        {
+            return static_cast<JarOpener *>(jar)->QNetworkCookieJar::validateCookie(cookie, url);
+        }
+        static void setAllCookies(QNetworkCookieJar *jar, const QList<QNetworkCookie> &cookieList)
+        {
+            static_cast<JarOpener *>(jar)->QNetworkCookieJar::setAllCookies(cookieList);
+        }
+    };
+};
+
+class CustomWebPage : public QWebEnginePage
+{
+public:
+    CustomWebPage(QWebEngineProfile *profile, QObject *_parent = nullptr)
+        : QWebEnginePage(profile, _parent), mw(nullptr), parent_webpage(nullptr)
+    {
+        updateUserAgent();
+    }
+
+    void setMainWindow(const MainWindow *_mw)
+    {
+        mw = const_cast<MainWindow *>(_mw);
+    }
+
+    void setWebPageWidget(WebPage *wp)
+    {
+        parent_webpage = wp;
+    }
+
+    void updateUserAgent()
     {
         QString str = SettingsPage::useragentString();
         if (str.isEmpty())
         {
-            SettingsPage::setUseragentString(str = QWebPage::userAgentForUrl(QUrl("https://example.com")));
+            str = profile()->httpUserAgent();
+            SettingsPage::setUseragentString(str);
         }
-        return str;
-    }
-private:
-    MainWindow * mw;
-};
-
-class CustomNetworkAccessManager: public QNetworkAccessManager
-{
-public:
-    CustomNetworkAccessManager(QObject * _parent = 0): QNetworkAccessManager(_parent) {}
-protected:
-    QNetworkReply * createRequest(Operation op, const QNetworkRequest &originalReq, QIODevice *outgoingData = Q_NULLPTR)
-    {
-        QNetworkRequest req = originalReq;
-        if (req.url().isLocalFile() && !req.url().host().isEmpty())
+        else
         {
-            qDebug() << "skip request" << req.url();
-            req = QNetworkRequest();
+            profile()->setHttpUserAgent(str);
         }
-        return QNetworkAccessManager::createRequest(op, req, outgoingData);
     }
+
+protected:
+    bool acceptNavigationRequest(const QUrl &url, NavigationType type, bool isMainFrame) override
+    {
+        if (url.isLocalFile() && !url.host().isEmpty())
+        {
+            qDebug() << "skip request" << url;
+            return false;
+        }
+        return QWebEnginePage::acceptNavigationRequest(url, type, isMainFrame);
+    }
+
+    QWebEnginePage *createWindow(WebWindowType type) override
+    {
+        if (mw == nullptr || parent_webpage == nullptr)
+        {
+            return QWebEnginePage::createWindow(type);
+        }
+        qDebug() << "createWindow";
+        mw->newWindow(parent_webpage->privacyMode());
+        return mw->lastPage() ? mw->lastPage()->page() : nullptr;
+    }
+
+    void javaScriptAlert(const QUrl &securityOrigin, const QString &msg) override
+    {
+        qDebug() << "alert" << msg;
+        QWebEnginePage::javaScriptAlert(securityOrigin, msg);
+    }
+
+    bool javaScriptConfirm(const QUrl &securityOrigin, const QString &msg) override
+    {
+        qDebug() << "confirm" << msg;
+        return QWebEnginePage::javaScriptConfirm(securityOrigin, msg);
+    }
+
+    void javaScriptConsoleMessage(JavaScriptConsoleMessageLevel level,
+                                  const QString &message,
+                                  int lineNumber,
+                                  const QString &sourceID) override
+    {
+        QWebEnginePage::javaScriptConsoleMessage(level, message, lineNumber, sourceID);
+    }
+
+    bool javaScriptPrompt(const QUrl &securityOrigin,
+                          const QString &msg,
+                          const QString &defaultValue,
+                          QString *result) override
+    {
+        qDebug() << "prompt" << msg;
+        return QWebEnginePage::javaScriptPrompt(securityOrigin, msg, defaultValue, result);
+    }
+
+private:
+    MainWindow *mw;
+    WebPage *parent_webpage;
 };
 
-class CompleterColumnDelegate: public QStyledItemDelegate
+class CompleterColumnDelegate : public QStyledItemDelegate
 {
 public:
-    CompleterColumnDelegate(QObject * _parent = 0): QStyledItemDelegate(_parent) {}
+    CompleterColumnDelegate(QObject *_parent = nullptr) : QStyledItemDelegate(_parent) {}
+
 protected:
-    void paint(QPainter * painter, const QStyleOptionViewItem & option, const QModelIndex & index) const
+    void paint(QPainter *painter, const QStyleOptionViewItem &option, const QModelIndex &index) const override
     {
         QStyleOptionViewItem opt = option;
         initStyleOption(&opt, index);
-
         if (index.column() == SettingsPage::completerHistoryModel()->fieldIndex("Description"))
         {
             opt.palette.setColor(QPalette::Text, QColor(Qt::gray));
             opt.font.setItalic(true);
         }
-
         QStyledItemDelegate::paint(painter, opt, index);
     }
 };
 
-class UrlCompleter: public QCompleter
+class UrlCompleter : public QCompleter
 {
 public:
-    UrlCompleter(QObject * _parent): QCompleter(_parent) {}
-    QString pathFromIndex(const QModelIndex & index) const
+    UrlCompleter(QObject *_parent) : QCompleter(_parent) {}
+    QString pathFromIndex(const QModelIndex &index) const override
     {
-        QSqlTableModel * model = SettingsPage::completerHistoryModel();
+        QSqlTableModel *model = SettingsPage::completerHistoryModel();
         QString desc = model->data(model->index(index.row(), model->fieldIndex("Description"))).toString();
         if (!desc.isEmpty())
         {
@@ -137,7 +283,7 @@ public:
     }
 };
 
-class CustomNetworkRequest: public QNetworkRequest
+class CustomNetworkRequest : public QNetworkRequest
 {
 public:
     struct Headers
@@ -145,22 +291,24 @@ public:
         QByteArray header;
         QByteArray value;
     };
-    CustomNetworkRequest(const QUrl &url, QList<Headers> headers = QList<Headers>()): QNetworkRequest(url)
+    CustomNetworkRequest(const QUrl &url, const QList<Headers> &headers = QList<Headers>())
+        : QNetworkRequest(url)
     {
-        setAttribute(QNetworkRequest::HTTP2AllowedAttribute, true);
+        setAttribute(QNetworkRequest::Http2AllowedAttribute, true);
         setAttribute(QNetworkRequest::RedirectPolicyAttribute, QNetworkRequest::NoLessSafeRedirectPolicy);
-        foreach (const Headers & header, headers)
+        for (const Headers &header : headers)
         {
             setRawHeader(header.header, header.value);
         }
     }
 };
 
-class HintSqlTableModel: public QSqlTableModel
+class HintSqlTableModel : public QSqlTableModel
 {
 public:
-    HintSqlTableModel(QObject * _parent = 0, QSqlDatabase db = QSqlDatabase()): QSqlTableModel(_parent, db) {}
-    QVariant data(const QModelIndex &idx, int role = Qt::DisplayRole) const
+    HintSqlTableModel(QObject *_parent = nullptr, QSqlDatabase db = QSqlDatabase())
+        : QSqlTableModel(_parent, db) {}
+    QVariant data(const QModelIndex &idx, int role = Qt::DisplayRole) const override
     {
         if (role == Qt::ToolTipRole)
         {
@@ -170,177 +318,50 @@ public:
     }
 };
 
-class DownloadsUrlColumnDelegate: public QStyledItemDelegate
+class DownloadsUrlColumnDelegate : public QStyledItemDelegate
 {
 public:
-    DownloadsUrlColumnDelegate(QObject * _parent = 0): QStyledItemDelegate(_parent) {}
+    DownloadsUrlColumnDelegate(QObject *_parent = nullptr) : QStyledItemDelegate(_parent) {}
+
 protected:
-    QString displayText(const QVariant & value, const QLocale &) const
+    QString displayText(const QVariant &value, const QLocale &) const override
     {
         return QFileInfo(value.toString()).fileName();
     }
 };
 
-class DownloadsTimeColumnDelegate: public QStyledItemDelegate
+class DownloadsTimeColumnDelegate : public QStyledItemDelegate
 {
 public:
-    DownloadsTimeColumnDelegate(QObject * _parent = 0): QStyledItemDelegate(_parent) {}
+    DownloadsTimeColumnDelegate(QObject *_parent = nullptr) : QStyledItemDelegate(_parent) {}
+
 protected:
-    QString displayText(const QVariant & value, const QLocale &) const
+    QString displayText(const QVariant &value, const QLocale &) const override
     {
         return QDateTime::fromString(value.toString(), "yyyy-MM-ddThh:mm:ss.zzz").toString("hh:mm, dd.MM");
     }
 };
 
-class DownloadsSizeColumnDelegate: public QStyledItemDelegate
+class DownloadsSizeColumnDelegate : public QStyledItemDelegate
 {
 public:
-    DownloadsSizeColumnDelegate(QObject * _parent = 0): QStyledItemDelegate(_parent) {}
+    DownloadsSizeColumnDelegate(QObject *_parent = nullptr) : QStyledItemDelegate(_parent) {}
+
 protected:
-    QString displayText(const QVariant & value, const QLocale &) const
+    QString displayText(const QVariant &value, const QLocale &) const override
     {
         qint64 size = value.toLongLong();
         if (size < 0.9 * 1024)
-        {
             return QString::number(size) + " b";
-        }
         size /= 1024;
         if (size < 0.9 * 1024)
-        {
             return QString::number(size) + " Kb";
-        }
         size /= 1024;
         if (size < 0.9 * 1024)
-        {
             return QString::number(size) + " Mb";
-        }
         size /= 1024;
         return QString::number(size) + " Gb";
     }
-};
-
-// idea from https://stackoverflow.com/questions/13971787/how-do-i-save-cookies-with-qt
-class SharedCookieJar: public QNetworkCookieJar
-{
-public:
-    SharedCookieJar(SettingsPage::Privacy _privacy, QObject *parent = 0) : QNetworkCookieJar(parent), privacy(_privacy)
-    {
-        if (privacy == SettingsPage::UsualPrivacy && * refCount(privacy) == 0)
-        {
-            qDebug() << "read cookies from" << SettingsPage::cookieJar();
-            QFile file(SettingsPage::cookieJar());
-            if (file.open(QFile::ReadOnly))
-            {
-                JarOpener::setAllCookies(sharedJar(privacy), QNetworkCookie::parseCookies(file.readAll()));
-                file.close();
-            }
-        }
-        (* refCount(privacy))++;
-//        setAllCookies(JarOpener::allCookies(sharedJar()));
-    }
-    virtual ~SharedCookieJar()
-    {
-        (* refCount(privacy))--;
-        if (* refCount(privacy) == 0)
-        {
-            if (privacy == SettingsPage::UsualPrivacy)
-            {
-                flush();
-            }
-            delete refCount(privacy);
-            delete sharedJar(privacy);
-            refCount(privacy) = 0;
-            sharedJar(privacy) = 0;
-        }
-    }
-    virtual QList<QNetworkCookie> cookiesForUrl(const QUrl &url) const
-    {
-        return sharedJar(privacy)->cookiesForUrl(url);
-    }
-
-    virtual bool setCookiesFromUrl(const QList<QNetworkCookie> &cookieList, const QUrl &url)
-    {
-        return sharedJar(privacy)->setCookiesFromUrl(cookieList, url);
-    }
-
-    virtual bool deleteCookie(const QNetworkCookie &cookie)
-    {
-        return sharedJar(privacy)->deleteCookie(cookie);
-    }
-    virtual bool insertCookie(const QNetworkCookie &cookie)
-    {
-        return sharedJar(privacy)->insertCookie(cookie);
-    }
-    virtual bool updateCookie(const QNetworkCookie &cookie)
-    {
-        return sharedJar(privacy)->updateCookie(cookie);
-    }
-    static void clear()
-    {
-        JarOpener::setAllCookies(sharedJar(SettingsPage::UsualPrivacy), QList<QNetworkCookie>());
-        JarOpener::setAllCookies(sharedJar(SettingsPage::IncognitoPrivacy), QList<QNetworkCookie>());
-    }
-    static void flush()
-    {
-        QByteArray data;
-        foreach (QNetworkCookie cookie, JarOpener::allCookies(sharedJar(SettingsPage::UsualPrivacy)))
-        {
-            if (!cookie.isSessionCookie())
-            {
-                data.append(cookie.toRawForm());
-                data.append("\n");
-            }
-        }
-        qDebug() << "write cookies to" << SettingsPage::cookieJar();
-        QFile file(SettingsPage::cookieJar());
-        if (file.open(QFile::WriteOnly))
-        {
-            file.write(data);
-            file.close();
-        }
-    }
-protected:
-    virtual bool validateCookie(const QNetworkCookie &cookie, const QUrl &url) const
-    {
-        return JarOpener::validateCookie(sharedJar(privacy), cookie, url);
-    }
-private:
-    SettingsPage::Privacy privacy;
-    static int * & refCount(SettingsPage::Privacy privacy)
-    {
-        static int * ref_count[2] = {0, 0};
-        if (ref_count[privacy] == 0)
-        {
-            ref_count[privacy] = new int;
-            * ref_count[privacy] = 0;
-        }
-        return ref_count[privacy];
-    }
-    static QNetworkCookieJar * & sharedJar(SettingsPage::Privacy privacy)
-    {
-        static QNetworkCookieJar * jar[2] = {0, 0};
-        if (jar[privacy] == 0)
-        {
-            jar[privacy] = new QNetworkCookieJar();
-        }
-        return jar[privacy];
-    }
-    class JarOpener: public QNetworkCookieJar
-    {
-    public:
-        static QList<QNetworkCookie> allCookies(QNetworkCookieJar * jar)
-        {
-            return ((JarOpener *)jar)->QNetworkCookieJar::allCookies();
-        }
-        static bool validateCookie(QNetworkCookieJar * jar, const QNetworkCookie &cookie, const QUrl &url)
-        {
-            return ((JarOpener *)jar)->QNetworkCookieJar::validateCookie(cookie, url);
-        }
-        static void setAllCookies(QNetworkCookieJar * jar, const QList<QNetworkCookie> &cookieList)
-        {
-            ((JarOpener *)jar)->QNetworkCookieJar::setAllCookies(cookieList);
-        }
-    };
 };
 
 #endif // CUSTOM_CLASSES_H

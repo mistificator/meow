@@ -1,4 +1,0 @@
-[submodule "QtWebKit"]
-	path = QtWebKit
-	url = https://github.com/qtwebkit/qtwebkit.git
-	branch = qtwebkit-dev-wip

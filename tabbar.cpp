@@ -4,11 +4,16 @@
 #include <QResizeEvent>
 #include <QDebug>
 
-TabBar::TabBar(QWidget * _parent): QTabBar(_parent), cached_height(-1), max_tab_size(200)
+TabBar::TabBar(QWidget *_parent)
+    : QTabBar(_parent), cached_height(-1), max_tab_size(200)
 {
     setElideMode(Qt::ElideRight);
     setUsesScrollButtons(true);
-    topLevelWidget()->installEventFilter(this);
+    setExpanding(false);
+    if (topLevelWidget())
+    {
+        topLevelWidget()->installEventFilter(this);
+    }
 }
 
 void TabBar::setMaximumTabSize(int sz)
@@ -36,17 +41,33 @@ bool TabBar::eventFilter(QObject *watched, QEvent *event)
     return QTabBar::eventFilter(watched, event);
 }
 
-// autosize tabs from http://www.prog.org.ru/topic_24142_0.html
+QSize TabBar::minimumSizeHint() const
+{
+    QSize sz = QTabBar::minimumSizeHint();
+    return QSize(0, qMax(sz.height(), 28));
+}
+
 QSize TabBar::tabSizeHint(int index) const
 {
-    const QSize last_section_hint = QTabBar::tabSizeHint(count() - 1);
-    if (index == count() - 1)
-    {
-        return last_section_hint;
-    }
+    const QSize base_hint = QTabBar::tabSizeHint(index);
     if (cached_height == -1)
     {
-        cached_height = QTabBar::tabSizeHint(index).height();
+        cached_height = base_hint.height();
     }
-    return QSize(qBound(1, (parentWidget()->width() - last_section_hint.width()) / (count() - 1), max_tab_size), cached_height);
+
+    const int n = qMax(1, count());
+    int available_width = parentWidget() ? parentWidget()->width() : width();
+
+    // Резервируем место под фиксированную кнопку справа, чтобы вкладки никогда на нее не наезжали
+    if (QTabWidget *tw = qobject_cast<QTabWidget *>(parentWidget()))
+    {
+        if (QWidget *cw = tw->cornerWidget(Qt::TopRightCorner))
+        {
+            const int cw_width = qMax(cw->width(), cw->sizeHint().width());
+            available_width -= (cw_width + 8);
+        }
+    }
+
+    const int tab_width = qBound(60, available_width / n, max_tab_size);
+    return QSize(tab_width, cached_height);
 }

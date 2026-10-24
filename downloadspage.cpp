@@ -108,16 +108,18 @@ void DownloadsPage::on_openFolder_clicked()
 {
     QString pathIn = SettingsPage::downloadsHistoryModel()->index(ui->downloadsTable->currentIndex().row(), SettingsPage::downloadsHistoryModel()->fieldIndex("File")).data().toString();
 
-// from Qt Creator source: https://stackoverflow.com/questions/3490336/how-to-reveal-in-finder-or-show-in-explorer-with-qt
     {
-        // Mac, Windows support folder or file.
     #if defined(Q_OS_WIN)
-        QString param;
+        QStringList args;
         if (!QFileInfo(pathIn).isDir())
-            param = QLatin1String("/select,");
-        param += QDir::toNativeSeparators(pathIn);
-        QString command = "explorer.exe " + param;
-        QProcess::startDetached(command);
+            args << QLatin1String("/select,") + QDir::toNativeSeparators(pathIn);
+        else
+            args << QDir::toNativeSeparators(pathIn);
+        QProcess::startDetached("explorer.exe", args);
+    #elif !defined(Q_OS_MAC)
+        const QFileInfo fileInfo(pathIn);
+        const QString folder = fileInfo.absolutePath();
+        QDesktopServices::openUrl(QUrl::fromLocalFile(folder));
     #elif defined(Q_OS_MAC)
         Q_UNUSED(parent)
         QStringList scriptArgs;
@@ -129,21 +131,6 @@ void DownloadsPage::on_openFolder_clicked()
         scriptArgs << QLatin1String("-e")
                    << QLatin1String("tell application \"Finder\" to activate");
         QProcess::execute("/usr/bin/osascript", scriptArgs);
-    #else
-        // we cannot select a file here, because no file browser really supports it...
-        const QFileInfo fileInfo(pathIn);
-        const QString folder = fileInfo.absoluteFilePath();
-        const QString app = Utils::UnixUtils::fileBrowser();
-        QProcess browserProc;
-        const QString browserArgs = Utils::UnixUtils::substituteFileBrowserParameters(app, folder);
-        qDebug() <<  browserArgs;
-        bool success = browserProc.startDetached(browserArgs);
-        const QString error = QString::fromLocal8Bit(browserProc.readAllStandardError());
-        success = success && error.isEmpty();
-        if (!success)
-        {
-            qDebug() << "on_openFolder_clicked" << app << error;
-        }
     #endif
     }
 

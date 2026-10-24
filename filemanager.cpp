@@ -10,7 +10,11 @@
 #include <QProgressDialog>
 #include <QBuffer>
 #include <QImageReader>
-#include <QtWebKit/QWebElement>
+#include <QRegularExpression>
+#include <QJsonDocument>
+#include <QJsonArray>
+#include <QJsonObject>
+#include <QTimer>
 
 struct FileManager::SavePageStruct
 {
@@ -19,42 +23,22 @@ struct FileManager::SavePageStruct
         activate(_path);
         switchRelative();
     }
-    void activate(QString _path)
-    {
-        p_path = _path;
-    }
-    QString path() const
-    {
-        return p_path;
-    }
-    bool isActive() const
-    {
-        return !p_path.isEmpty();
-    }
-    void switchRelative()
-    {
-        p_root = false;
-    }
-    void switchRoot()
-    {
-        p_root = true;
-    }
-    bool isRoot() const
-    {
-        return p_root;
-    }
-    void reset()
-    {
-        p_path.clear();
-    }
+    void activate(QString _path) { p_path = _path; }
+    QString path() const { return p_path; }
+    bool isActive() const { return !p_path.isEmpty(); }
+    void switchRelative() { p_root = false; }
+    void switchRoot() { p_root = true; }
+    bool isRoot() const { return p_root; }
+    void reset() { p_path.clear(); }
+
 private:
     QString p_path;
     bool p_root;
 };
 
-FileManager::FileManager(QObject *parent) : QObject(parent), save_page(new SavePageStruct()), webpage(0)
+FileManager::FileManager(QObject *parent)
+    : QObject(parent), webpage(nullptr), save_page(new SavePageStruct())
 {
-
 }
 
 FileManager::~FileManager()
@@ -62,12 +46,12 @@ FileManager::~FileManager()
     delete save_page;
 }
 
-void FileManager::setWebPage(WebPage * wp)
+void FileManager::setWebPage(WebPage *wp)
 {
     webpage = wp;
 }
 
-bool FileManager::checkRedirect(QNetworkReply * reply) const
+bool FileManager::checkRedirect(QNetworkReply *reply) const
 {
     const QString content_type = reply->header(QNetworkRequest::ContentTypeHeader).toString();
     const QString request_content_type = reply->request().header(QNetworkRequest::ContentTypeHeader).toString();
@@ -77,12 +61,12 @@ bool FileManager::checkRedirect(QNetworkReply * reply) const
             !save_page->isActive());
 }
 
-void FileManager::setStateFrom(FileManager * fm)
+void FileManager::setStateFrom(FileManager *fm)
 {
-    * save_page = * fm->save_page;
+    *save_page = *fm->save_page;
 }
 
-QString FileManager::adjustFilename(QString filename, QString content, const QByteArray & data)
+QString FileManager::adjustFilename(QString filename, QString content, const QByteArray &data)
 {
     QString known_content;
     if (filename.isEmpty())
@@ -92,19 +76,18 @@ QString FileManager::adjustFilename(QString filename, QString content, const QBy
     if (!content.isEmpty())
     {
         known_content = Meow::contentTypeForSuffix(QFileInfo(filename).suffix());
-        if (QFileInfo(filename).suffix().isEmpty() || known_content.isEmpty() || (!known_content.isEmpty() && !content.startsWith(known_content, Qt::CaseInsensitive)))
+        if (QFileInfo(filename).suffix().isEmpty() || known_content.isEmpty() ||
+            (!known_content.isEmpty() && !content.startsWith(known_content, Qt::CaseInsensitive)))
         {
             QString known_suffix = Meow::suffixForContentType(content);
             if (!known_suffix.isEmpty())
             {
                 filename += known_suffix;
-//                qDebug() << "adjusted filename" << filename << "content" << Meow::adjustedContentType(content);
                 return filename;
             }
         }
         else
         {
-//            qDebug() << "adjusted filename" << filename << "content" << Meow::adjustedContentType(content);
             return filename;
         }
     }
@@ -116,18 +99,16 @@ QString FileManager::adjustFilename(QString filename, QString content, const QBy
     {
         QBuffer buf;
         buf.setData(data);
-        QImageReader img(& buf);
+        QImageReader img(&buf);
         if (img.canRead())
         {
-            filename += "." + img.format();
+            filename += "." + QString::fromLatin1(img.format());
         }
-        else
-        if (data.trimmed().startsWith("<"))
+        else if (data.trimmed().startsWith("<"))
         {
             filename += ".html";
         }
     }
-//    qDebug() << "adjusted filename" << filename;
     return filename;
 }
 
@@ -136,26 +117,15 @@ void FileManager::modifyExif(QString filename, QUrl file_url, QUrl page_url, QSt
     tags.removeDuplicates();
     if (fmeta.setImage(filename))
     {
-        qDebug() << filename << tags << file_url << page_url;
-        if (
-                fmeta.setField(FileMetadata::TagXPKeywords, tags.join("; ")) &&
-                fmeta.setField(FileMetadata::TagExifUserComment, file_url.toString() + "\n\n" + page_url.toString())
-            )
+        if (fmeta.setField(FileMetadata::TagXPKeywords, tags.join("; ")) &&
+            fmeta.setField(FileMetadata::TagExifUserComment, file_url.toString() + "\n\n" + page_url.toString()))
         {
             qDebug() << "properties of" << QFileInfo(filename).fileName() << "updated";
         }
-        else
-        {
-            qDebug() << "properties of" << QFileInfo(filename).fileName() << "NOT updated";
-        }
-    }
-    else
-    {
-        qDebug() << "couldn't open" << QFileInfo(filename).fileName() << "to update properties";
     }
 }
 
-void FileManager::saveReplyToDisk(QNetworkReply * reply)
+void FileManager::saveReplyToDisk(QNetworkReply *reply)
 {
     if (!reply->isOpen())
     {
@@ -168,9 +138,6 @@ void FileManager::saveReplyToDisk(QNetworkReply * reply)
     }
     else
     {
-        qDebug() << "redirect detected" <<
-                    reply->url() <<
-                    reply->header(QNetworkRequest::ContentTypeHeader).toString();
         if (webpage)
         {
             webpage->createHiddenWindow(reply->url(), Qt::DirectConnection);
@@ -178,10 +145,8 @@ void FileManager::saveReplyToDisk(QNetworkReply * reply)
     }
 }
 
-void FileManager::saveReplyToDisk(const QUrl & url, const QByteArray & data, QString content_type)
+void FileManager::saveReplyToDisk(const QUrl &url, const QByteArray &data, QString content_type)
 {
-    qDebug() << "saveReplyToDisk" << url;
-
     QString url_adjusted = url.toString(QUrl::RemoveScheme | QUrl::RemovePort);
     QString filename = Meow::excludeUndesiredSymbols(QFileInfo(url_adjusted).fileName());
     filename = adjustFilename(filename, content_type, data);
@@ -191,36 +156,36 @@ void FileManager::saveReplyToDisk(const QUrl & url, const QByteArray & data, QSt
         switch (SettingsPage::savePolicy())
         {
         case SettingsPage::SaveAsk:
+        {
+            QString save_file_name = QFileDialog::getSaveFileName(
+                webpage ? webpage->topLevelWidget() : nullptr,
+                "Download file \"" + filename + "\"",
+                SettingsPage::currentSavePath() + "/" + filename);
+            if (save_file_name.isEmpty())
             {
-                QString save_file_name = QFileDialog::getSaveFileName(webpage ? webpage->topLevelWidget() : 0, "Download file \"" + filename + "\"", SettingsPage::currentSavePath() + "/" + filename);
-                if (save_file_name.isEmpty())
-                {
-                    return;
-                }
-                path = QFileInfo(save_file_name).dir().path() + "/";
-                filename = QFileInfo(save_file_name).fileName();
-                SettingsPage::setCurrentSavePath(path);
+                return;
             }
-            break;
+            path = QFileInfo(save_file_name).dir().path() + "/";
+            filename = QFileInfo(save_file_name).fileName();
+            SettingsPage::setCurrentSavePath(path);
+        }
+        break;
         case SettingsPage::SaveSilent:
-            {
-            //    QString dir = QFileInfo(url_adjusted).dir().path();
-                QString dir = QFileInfo(webpage ? webpage->currentUrl().toString(QUrl::RemoveScheme | QUrl::RemovePort) : "no_page").dir().path();
-//                qDebug() << "download" << dir << filename;
-                path = SettingsPage::savePath() + "/" + dir + "/";
-                QDir().mkpath(path);
-            }
-            break;
+        {
+            QString dir = QFileInfo(webpage ? webpage->currentUrl().toString(QUrl::RemoveScheme | QUrl::RemovePort) : "no_page").dir().path();
+            path = SettingsPage::savePath() + "/" + dir + "/";
+            QDir().mkpath(path);
+        }
+        break;
         }
     }
     else
     {
         QString dir = QFileInfo(url_adjusted).dir().path();
-//        QString dir = QFileInfo(current_url.toString(QUrl::RemoveScheme | QUrl::RemovePort)).dir().path();
         path = save_page->path() + "/";
         if (!save_page->isRoot())
         {
-            path += dir +"/";
+            path += dir + "/";
         }
         QDir().mkpath(path);
         int i = 2;
@@ -232,34 +197,31 @@ void FileManager::saveReplyToDisk(const QUrl & url, const QByteArray & data, QSt
         }
     }
 
-    last_file_name = QString(path + filename).replace(QRegExp("[\\/]+"), "/");
+    last_file_name = QString(path + filename).replace(QRegularExpression("[\\\\/]+"), "/");
     QFile file(last_file_name);
     if (!data.isEmpty() && file.open(QFile::WriteOnly))
     {
         file.write(data);
         file.close();
-
         SettingsPage::addDownloadEntry(
-                    file.fileName(),
-                    url.toString(),
-                    webpage ? webpage->currentUrl().toString() : "",
-                    file.size(),
-                    webpage ? webpage->currentPageTitle() : "",
-                    webpage ? webpage->currentAltText() : ""
-                    );
+            file.fileName(),
+            url.toString(),
+            webpage ? webpage->currentUrl().toString() : "",
+            file.size(),
+            webpage ? webpage->currentPageTitle() : "",
+            webpage ? webpage->currentAltText() : "");
 
         if (SettingsPage::writeMetadataEnabed() && content_type.startsWith("image", Qt::CaseInsensitive))
         {
             modifyExif(
-                        file.fileName(),
-                        url,
-                        webpage ? webpage->currentUrl() : QUrl(),
-                        QStringList() <<
-                            Meow::excludeUndesiredSymbols(webpage ? webpage->currentPageTitle() : "") <<
-                            Meow::excludeUndesiredSymbols(webpage ? webpage->currentAltText() : "") <<
-                            Meow::excludeUndesiredSymbols(webpage ? webpage->currentUrl().host() : "") <<
-                            Meow::excludeUndesiredSymbols(url.host())
-                        );
+                file.fileName(),
+                url,
+                webpage ? webpage->currentUrl() : QUrl(),
+                QStringList()
+                    << Meow::excludeUndesiredSymbols(webpage ? webpage->currentPageTitle() : "")
+                    << Meow::excludeUndesiredSymbols(webpage ? webpage->currentAltText() : "")
+                    << Meow::excludeUndesiredSymbols(webpage ? webpage->currentUrl().host() : "")
+                    << Meow::excludeUndesiredSymbols(url.host()));
         }
 
         if (SettingsPage::savePolicy() == SettingsPage::SaveSilent && !save_page->isActive())
@@ -269,15 +231,13 @@ void FileManager::saveReplyToDisk(const QUrl & url, const QByteArray & data, QSt
             do
             {
                 link = SettingsPage::savePath() + "/" + filename + (count > 0 ? "(" + QString::number(count) + ")" : "");
-        #ifdef Q_OS_WIN
+#ifdef Q_OS_WIN
                 link += ".lnk";
-        #endif
+#endif
                 count++;
-            }
-            while (QFile::exists(link));
+            } while (QFile::exists(link));
             file.link(link);
         }
-
         emit showNotifier("\"" + filename + "\" downloaded");
     }
     else
@@ -286,24 +246,28 @@ void FileManager::saveReplyToDisk(const QUrl & url, const QByteArray & data, QSt
     }
 }
 
-QString FileManager::parseCssBgImageUrl(const QString & css, int & start, int & end)
+QString FileManager::parseCssBgImageUrl(const QString &css, int &start, int &end)
 {
-    QRegExp re("url\\s*\\(\\s*[\\/:\"'&?=\\.\\+\\-%\\w]*\\s*\\)");
-    start = re.indexIn(css, start);
-    if (start < 0)
+    static const QRegularExpression re("url\\s*\\(\\s*[\\/:\"'&?=\\.\\+\\-%\\w]*\\s*\\)");
+    QRegularExpressionMatch match = re.match(css, start);
+    if (!match.hasMatch())
     {
+        start = -1;
         end = -1;
         return QString();
     }
-    end = start + re.matchedLength();
-    return css.mid(start, end - start).replace(QRegExp("url\\s*\\(\\s*[\"']*"), "").replace(QRegExp("\\s*[\"']*\\s*\\)"), "");
+    start = match.capturedStart();
+    end = match.capturedEnd();
+    QString raw = match.captured(0);
+    raw.replace(QRegularExpression("^url\\s*\\(\\s*[\"']*"), "");
+    raw.replace(QRegularExpression("\\s*[\"']*\\s*\\)$"), "");
+    return raw;
 }
 
 QString FileManager::savePageElement(QString tag, QString attr, QString value)
 {
     if (!webpage || value.isEmpty() ||
-//            (tag.compare("img", Qt::CaseInsensitive) == 0 && value.endsWith(".ico", Qt::CaseInsensitive)) ||
-            (tag.compare("a", Qt::CaseInsensitive) == 0 && !QUrl(value).isValid()))
+        (tag.compare("a", Qt::CaseInsensitive) == 0 && !QUrl(value).isValid()))
     {
         return QString();
     }
@@ -316,27 +280,31 @@ QString FileManager::savePageElement(QString tag, QString attr, QString value)
             return QString();
         }
     }
-    QUrl url(value);
-    qDebug() << tag << attr << value << url << url.host();
-    if (url.host().isEmpty())
+
+    // Исправлено разрешение относительных URL
+    QUrl url = webpage->currentUrl().resolved(QUrl(value));
+    if (!url.isValid() || url.scheme().startsWith("data", Qt::CaseInsensitive) || url.scheme().startsWith("javascript", Qt::CaseInsensitive))
     {
-        url = QUrl("//" + webpage->currentUrl().host() + url.toString());
+        return QString();
     }
-    if (url.scheme().isEmpty())
-    {
-        url.setScheme(webpage->currentUrl().scheme());
-    }
-    if (tag.compare("a", Qt::CaseInsensitive) == 0 /*|| tag.compare("link", Qt::CaseInsensitive) == 0*/)
+    if (tag.compare("a", Qt::CaseInsensitive) == 0)
     {
         return url.toString();
     }
-    qDebug() << tag << attr << value << url;
+
+    last_file_name.clear();
     QEventLoop loop;
     QTimer timer;
-    connect(webpage, SIGNAL(downloadFinished()), & loop, SLOT(quit()));
+    timer.setSingleShot(true);
+    connect(webpage, &WebPage::downloadFinished, &loop, &QEventLoop::quit);
+    connect(&timer, &QTimer::timeout, &loop, &QEventLoop::quit);
     webpage->downloadRequest(CustomNetworkRequest(url));
-    timer.singleShot(30000, & loop, SLOT(quit()));
+    timer.start(30000);
     loop.exec();
+
+    if (last_file_name.isEmpty())
+        return QString();
+
     QDir().mkpath(QFileInfo(last_file_name).absolutePath());
     return QDir(save_page->path()).relativeFilePath(last_file_name);
 }
@@ -344,17 +312,13 @@ QString FileManager::savePageElement(QString tag, QString attr, QString value)
 void FileManager::savePage()
 {
     if (!webpage)
-    {
         return;
-    }
-    qDebug() << "save page";
+
     if (SettingsPage::savePolicy() == SettingsPage::SaveAsk)
     {
         QString path = QFileDialog::getExistingDirectory(webpage->topLevelWidget(), "Folder to save page", SettingsPage::currentSavePath());
         if (path.isEmpty())
-        {
             return;
-        }
         SettingsPage::setCurrentSavePath(path);
         save_page->activate(path);
     }
@@ -362,128 +326,154 @@ void FileManager::savePage()
     {
         save_page->activate(SettingsPage::savePath() + "/pages/" + Meow::excludeUndesiredSymbols(webpage->currentPageTitle()) + "/");
     }
+
     webpage->view()->stop();
     webpage->setEnabled(false);
-
-    save_page->switchRoot();
-
-    WebPage * local_page = webpage->createHiddenWindow(QUrl());
-    local_page->disconnect(this);
-    local_page->page()->settings()->setAttribute(QWebSettings::JavascriptEnabled, false);
-
-    /*
-    // download html
-    {
-        QEventLoop loop;
-        connect(webpage, SIGNAL(downloadFinished()), & loop, SLOT(quit()));
-        webpage->downloadRequest(CustomNetworkRequest(webpage->view()->url()));
-        loop.exec();
-        qDebug() << "download finished" << last_file_name;
-    }
-
-    // set html to hidden page
-    if (QFile::exists(last_file_name))
-    {
-        QFile file(last_file_name);
-        file.open(QFile::ReadOnly);
-        local_page->view()->setHtml(QString::fromUtf8(file.readAll()));
-        local_page->view()->stop();
-        qDebug() << "setting html finished" << last_file_name;
-        file.close();
-        QFile::remove(last_file_name);
-    }
-    */
-
-    // no loading, just setting html
-    local_page->view()->setHtml(webpage->page()->mainFrame()->toHtml());
-    local_page->view()->stop();
-
     save_page->switchRelative();
+    QDir().mkpath(save_page->path());
 
-    QProgressDialog * progress = new QProgressDialog(webpage->view());
+    QProgressDialog *progress = new QProgressDialog(webpage->view());
     progress->setWindowTitle("Saving page");
     progress->setWindowFlags(Qt::CustomizeWindowHint | Qt::Tool | Qt::WindowCloseButtonHint);
     progress->setMinimumDuration(500);
-    QDir().mkpath(save_page->path());
-    QWebElement document = local_page->page()->mainFrame()->documentElement();
-    QMultiMap< QString, QList<QWebElement> > map;
-    QList<QWebElement> list;
-    int count = 0;
-    list = document.findAll("img").toList();
-    map.insertMulti("src", list); count += list.count();
-    list = document.findAll("script").toList();
-    map.insertMulti("src", list); count += list.count();
-    list = document.findAll("link").toList();
-    map.insertMulti("href", list); count += list.count();
-    list = document.findAll("a").toList();
-    map.insertMulti("href", list); count += list.count();
-    map.insertMulti("style", list); count += list.count();
-    list = document.findAll("div").toList();
-    map.insertMulti("style", list); count += list.count();
-    list = document.findAll("span").toList();
-    map.insertMulti("style", list); count += list.count();
-    list = document.findAll("iframe").toList();
-    map.insertMulti("src", list); count += list.count();
-    progress->setMaximum(0);
     progress->setWindowModality(Qt::NonModal);
 
-    foreach (QWebElement el, document.findAll("style").toList())
+    // 1. Собираем через JS все ресурсы из DOM (img, script, link, a, div, span, iframe, style)
+    const QString collectJs = R"JS(
+        (function() {
+            var items = [];
+            var selectors = [
+                ['img', 'src'], ['script', 'src'], ['link', 'href'],
+                ['a', 'href'], ['a', 'style'], ['div', 'style'],
+                ['span', 'style'], ['iframe', 'src']
+            ];
+            selectors.forEach(function(pair) {
+                var els = document.querySelectorAll(pair[0]);
+                for (var i = 0; i < els.length; i++) {
+                    var val = els[i].getAttribute(pair[1]);
+                    if (val) items.push({tag: pair[0], attr: pair[1], val: val});
+                }
+            });
+            var styles = [];
+            var styleEls = document.querySelectorAll('style');
+            for (var j = 0; j < styleEls.length; j++) {
+                styles.push(styleEls[j].textContent || '');
+            }
+            return JSON.stringify({items: items, styles: styles});
+        })()
+    )JS";
+
+    QJsonDocument doc = QJsonDocument::fromJson(webpage->evalJsSync(collectJs).toString().toUtf8());
+    QJsonArray items = doc.object().value("items").toArray();
+    QJsonArray styles = doc.object().value("styles").toArray();
+
+    progress->setMaximum(items.size() + styles.size());
+    int step = 0;
+
+    QJsonArray updatedStyles;
+    for (const QJsonValue &sVal : styles)
     {
         if (progress->wasCanceled())
-        {
             break;
-        }
-        QString css = el.toPlainText();
+        progress->setValue(step++);
+        QString css = sVal.toString();
         int end = 0;
-        while (end >= 0)
+        while (end >= 0 && !progress->wasCanceled())
         {
-            if (progress->wasCanceled())
-            {
-                break;
-            }
             int start = end;
-            QString url = parseCssBgImageUrl(css, start, end);
-            if (start >= 0 && !url.isEmpty())
+            QString u = parseCssBgImageUrl(css, start, end);
+            if (start >= 0 && !u.isEmpty())
             {
-                QString res = savePageElement(QString(), QString(), url);
+                QString res = savePageElement(QString(), QString(), u);
                 if (!res.isEmpty())
                 {
-                    css = css.remove(start, end - start).insert(start, "url('" + res + "')");
-                    end += (5 + res.length() + 2) - (end - start);
+                    QString replacement = "url('" + res + "')";
+                    css.replace(start, end - start, replacement);
+                    end = start + replacement.length();
                 }
             }
         }
-
-        el.setPlainText(css);
+        updatedStyles.append(css);
     }
 
-    progress->setMaximum(count);
-
-    int k = 0;
-    for (QMultiMap< QString, QList<QWebElement> >::iterator i = map.begin(); i != map.end(); ++i)
+    QJsonObject attrReplacements;
+    for (const QJsonValue &itVal : items)
     {
         if (progress->wasCanceled())
-        {
             break;
-        }
-        QString url_attr = i.key();
-        foreach (QWebElement el, i.value())
+        progress->setValue(step++);
+        QJsonObject obj = itVal.toObject();
+        QString tag = obj.value("tag").toString();
+        QString attr = obj.value("attr").toString();
+        QString val = obj.value("val").toString();
+        QString key = tag + "|" + attr + "|" + val;
+        if (!attrReplacements.contains(key))
         {
-            progress->setValue(k++);
-            QString res = savePageElement(el.tagName(), url_attr, el.attribute(url_attr));
+            QString res = savePageElement(tag, attr, val);
             if (!res.isEmpty())
             {
-                el.setAttribute(url_attr, res);
+                if (attr == "style")
+                {
+                    int s = 0, e = 0;
+                    parseCssBgImageUrl(val, s, e);
+                    if (s >= 0)
+                    {
+                        QString newStyle = val;
+                        newStyle.replace(s, e - s, "url('" + res + "')");
+                        attrReplacements.insert(key, newStyle);
+                    }
+                }
+                else
+                {
+                    attrReplacements.insert(key, res);
+                }
             }
         }
     }
+
+    // 2. Применяем замены на клоне документа в JS и получаем итоговый HTML
+    QJsonObject payload;
+    payload.insert("replacements", attrReplacements);
+    payload.insert("styles", updatedStyles);
+    QString payloadJson = QString::fromUtf8(QJsonDocument(payload).toJson(QJsonDocument::Compact));
+
+    QString applyJs = QString(R"JS(
+        (function(data) {
+            var clone = document.documentElement.cloneNode(true);
+            var styleEls = clone.querySelectorAll('style');
+            for (var j = 0; j < styleEls.length && j < data.styles.length; j++) {
+                styleEls[j].textContent = data.styles[j];
+            }
+            var selectors = [
+                ['img', 'src'], ['script', 'src'], ['link', 'href'],
+                ['a', 'href'], ['a', 'style'], ['div', 'style'],
+                ['span', 'style'], ['iframe', 'src']
+            ];
+            selectors.forEach(function(pair) {
+                var els = clone.querySelectorAll(pair[0]);
+                for (var i = 0; i < els.length; i++) {
+                    var val = els[i].getAttribute(pair[1]);
+                    var key = pair[0] + '|' + pair[1] + '|' + val;
+                    if (val && data.replacements[key]) {
+                        els[i].setAttribute(pair[1], data.replacements[key]);
+                    }
+                }
+            });
+            return '<!DOCTYPE html>\n' + clone.outerHTML;
+        })(%1)
+    )JS").arg(payloadJson);
+
+    QString finalHtml = webpage->evalJsSync(applyJs).toString();
+
     save_page->switchRoot();
-    qDebug() << "final save to disk";
-    saveReplyToDisk(Meow::excludeUndesiredSymbols(webpage->currentPageTitle()) + ".html", local_page->page()->mainFrame()->toHtml().toUtf8(), "text/html");
+    saveReplyToDisk(QUrl(Meow::excludeUndesiredSymbols(webpage->currentPageTitle()) + ".html"),
+                    finalHtml.toUtf8(), "text/html");
     save_page->reset();
-    QMetaObject::invokeMethod(webpage, "newWindowLink", Qt::QueuedConnection, Q_ARG(QUrl, QUrl("file:///" + last_file_name)));
+
+    QMetaObject::invokeMethod(webpage, "newWindowLink", Qt::QueuedConnection,
+                              Q_ARG(QUrl, QUrl::fromLocalFile(last_file_name)));
+
     progress->hide();
     progress->deleteLater();
-    local_page->deleteLater();
     webpage->setEnabled(true);
 }

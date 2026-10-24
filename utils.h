@@ -4,35 +4,38 @@
 #include <QFile>
 #include <QTextStream>
 #include <QDebug>
-#include <QRegExp>
+#include <QRegularExpression>
 #include <QApplication>
 
 namespace Meow
 {
-    static QString resourceString(QString rc)
+static QString resourceString(const QString &rc)
+{
+    QFile file(rc);
+    if (file.open(QFile::ReadOnly))
     {
-        QString str;
-        QFile file(rc);
-        if (file.open(QFile::ReadOnly))
-        {
-            str = QTextStream(& file).readAll();
-            file.close();
-        }
-        return str;
+        return QTextStream(&file).readAll();
     }
-    static QRegExp undesiredSymbols(QString str = "\"&,\\:?/*|<>")
-    {
-        return QRegExp("[" + str + "]");
-    }
-    static QString excludeUndesiredSymbols(QString source, QString replacer = QString(), QRegExp undesired_symbols = undesiredSymbols())
-    {
-        return source.replace(undesired_symbols, replacer);
-    }
-    static void waitEventsProcessing()
-    {
-        qApp->sendPostedEvents();
-        qApp->processEvents();
-    }
+    return QString();
+}
+
+static QRegularExpression undesiredSymbols(const QString &str = "\"&,\\:?/*|<>")
+{
+    return QRegularExpression("[" + QRegularExpression::escape(str) + "]");
+}
+
+static QString excludeUndesiredSymbols(QString source,
+                                       const QString &replacer = QString(),
+                                       const QRegularExpression &undesired_symbols = undesiredSymbols())
+{
+    return source.replace(undesired_symbols, replacer);
+}
+
+static void waitEventsProcessing()
+{
+    qApp->sendPostedEvents();
+    qApp->processEvents();
+}
 }
 
 #endif // UTILS_H

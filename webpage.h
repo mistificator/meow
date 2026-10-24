@@ -3,11 +3,13 @@
 
 #include <QWidget>
 #include <QUrl>
-#include <QtWebKitWidgets/QWebHitTestResult>
-#include <QtWebKitWidgets/QWebView>
+#include <QWebEngineView>
+#include <QWebEnginePage>
+#include <QWebEngineProfile>
+#include <QWebEngineContextMenuRequest>
+#include <QWebEngineDownloadRequest>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
-#include <QtWebKitWidgets/QWebInspector>
 #include <QCompleter>
 
 #include "settingspage.h"
@@ -19,33 +21,40 @@ class WebPage;
 class FileManager;
 class DownloadManager;
 class MainWindow;
+class SharedCookieJar;
+
 class WebPage : public QWidget
 {
     Q_OBJECT
 
 public:
-    explicit WebPage(SettingsPage::Privacy _privacy = SettingsPage::UsualPrivacy, QWidget *parent = 0);
-    ~WebPage();
-    QWebView * view() const;
-    QWebPage * page() const;
+    explicit WebPage(SettingsPage::Privacy _privacy = SettingsPage::UsualPrivacy, QWidget *parent = nullptr);
+    ~WebPage() override;
+
+    QWebEngineView *view() const;
+    QWebEnginePage *page() const;
     SettingsPage::Privacy privacyMode() const;
     bool isToolWindow() const;
     bool isHiddenWindow() const;
-    WebPage * createToolWindow(QUrl url, QString title = "", Qt::ConnectionType conn = Qt::QueuedConnection) const;
-    WebPage * createHiddenWindow(QUrl url, Qt::ConnectionType conn = Qt::QueuedConnection) const;
-
+    WebPage *createToolWindow(QUrl url, QString title = "", Qt::ConnectionType conn = Qt::QueuedConnection) const;
+    WebPage *createHiddenWindow(QUrl url, Qt::ConnectionType conn = Qt::QueuedConnection) const;
     QUrl currentUrl() const { return current_url; }
     QString currentAltText() const { return current_alt_text; }
     QString currentPageTitle() const { return current_page_title; }
     QPoint currentPos() const { return current_pos; }
+    void setMainWindow(const MainWindow *_mw);
 
-    void setMainWindow(const MainWindow * _mw);
+    // Синхронное получение HTML или выполнение JS (для FileManager)
+    QString fetchHtmlSync() const;
+    QVariant evalJsSync(const QString &jsSource) const;
+
 public slots:
-    void downloadRequest(const QNetworkRequest & request);
+    void downloadRequest(const QNetworkRequest &request);
     void runScript();
     void inspectCurrentElement();
-    void load(const QUrl & url);
+    void load(const QUrl &url);
     void savePage();
+
 private slots:
     void on_actionLoadPage_triggered();
     void on_actionReloadPage_triggered();
@@ -58,25 +67,17 @@ private slots:
     void on_webView_loadStarted();
     void on_actionSearchImage_triggered();
     void on_actionTranslateSelected_triggered();
-
-    void customContextMenuRequested(const QPoint & pos);
-
+    void customContextMenuRequested(const QPoint &pos);
     void actionOpenLink();
     void actionOpenLinkInNewWindow();
-    void actionOpenFrameInNewWindow();
     void actionOpenImageInNewWindow();
     void actionDownloadLinkToDisk();
     void actionDownloadImageToDisk();
-
-    void downloadFinished(QNetworkReply *);
-    void initialLayoutCompleted();
-    void unsupportedContent(QNetworkReply * reply);
-    void redirected(const QUrl &url);
-    void featurePermissionRequested(QWebFrame* frame, QWebPage::Feature feature);
-    void frameCreated(QWebFrame * frame);
-
+    void networkDownloadFinished(QNetworkReply *);
+    void featurePermissionRequested(const QUrl &securityOrigin, QWebEnginePage::Feature feature);
     void updownProgress(qint64 processed, qint64 total);
     void on_webAddress_customContextMenuRequested(const QPoint &pos);
+    void handleProfileDownload(QWebEngineDownloadRequest *download);
 
 private:
     Ui::WebPage *ui;
@@ -84,33 +85,38 @@ private:
     QPoint current_pos;
     QString current_page_title;
     QString current_alt_text;
-    QString last_file_name;
     SettingsPage::Privacy privacy;
     QString script;
-    QWebInspector * inspector;
-    QCompleter * completer;
+    QWebEngineView *inspector_view;
+    QCompleter *completer;
     bool tool_window;
     bool temporary;
     QUrl requested_url;
-    DownloadManager * dmanager;
-    FileManager * fmanager;
-    MainWindow * mw;
+    DownloadManager *dmanager;
+    FileManager *fmanager;
+    SharedCookieJar *cookie_jar;
+    MainWindow *mw;
+
+    static QWebEngineProfile *sharedProfile(SettingsPage::Privacy p);
+
     void drawMeowCat();
     void setIncognito();
     void applyIcon();
     void applyTitle();
-    QWebHitTestResult hitTest(QPoint) const;
-    void runUserScriptRecursive(QWebFrame *);
-    void updateCompleter(QString, QString);
+    QString queryElementAltAt(const QPoint &pos) const;
+    void runUserScript();
+    void updateCompleter(QString phrase, QString desc);
+
 protected:
-    void showEvent(QShowEvent *);
-    bool eventFilter(QObject *watched, QEvent *event);
+    void showEvent(QShowEvent *) override;
+    bool eventFilter(QObject *watched, QEvent *event) override;
+
 signals:
     void newWindowLink(QUrl);
-    void linkHovered(const QString & link, const QString & title, const QString & textContent);
+    void linkHovered(const QString &link, const QString &title, const QString &textContent);
     void showNotifier(QString, int timeout = 5000);
     void downloadProgress(qint64, qint64);
-    void downloadFinished();
+    void downloadFinished(QNetworkReply *reply);
 };
 
 #endif // WEBPAGE_H
